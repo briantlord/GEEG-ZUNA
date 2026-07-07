@@ -1,0 +1,283 @@
+# GEEG-ZUNA — Findings Report
+
+**Exploring use cases for ZUNA (Zyphra) on resting-state EEG — waveform reconstruction and,
+centrally, the preservation of EEG-derived psychological/clinical measures (frontal alpha
+asymmetry).** Prepared to share privately with Zyphra to seek counsel on correct use of the model.
+
+---
+
+## 1. Executive summary
+
+We are **exploring use cases** for ZUNA (the ~382M-parameter masked-diffusion EEG foundation
+model, `Zyphra/ZUNA`) — in particular, whether its learned prior adds value for
+**psychological/clinical measures derived from EEG**, using missing-channel reconstruction as the
+pretext task. We compare it to classical interpolation on a resting-state cohort with a nested
+test–retest design (subject → day → Rest1/Rest2). The measure we care about most is **frontal
+alpha asymmetry (FAA)**, a widely used affective/clinical index.
+
+Two findings, and one request:
+
+1. **Classical interpolation is a strong baseline for waveform recovery — at least in the regime we
+   tested.** On our dense 62-channel montage, scored in-band (≤45 Hz) in a common-mode-free frame,
+   **K=8 nearest-neighbour linear interpolation is hard to beat** (r ≈ 0.955, RMSE ≈ 12 µV,
+   SDR ≈ 20 dB) and degrades only modestly even when many channels are dropped. ZUNA does not beat
+   it here. We read this as: *raw-waveform reconstruction on a dense montage is a poor place to look
+   for a learned prior's advantage* — **not** that interpolation is universally sufficient (it
+   depends on montage density, dropout pattern, frequency band, and reference frame, none of which
+   we have swept exhaustively). It is a workable baseline, not a solved problem.
+
+2. **On the one biomarker where classical methods struggle — frontal alpha asymmetry (FAA) —
+   ZUNA helps but does not clear the bar.** Judged against each biomarker's own same-day
+   test–retest floor across 5 subjects, ZUNA **misses the primary (mid-frontal F3/F4) FAA floor**
+   (error 0.228 vs floor 0.208), though it **beats linear** and **passes the lateral (F7/F8) floor**
+   (0.221 < 0.301). It is the **worst of the three methods** on the posterior biomarkers
+   (IAF, posterior-α, 1/f slope).
+
+3. **The request:** our two preprocessing pipelines reach *opposite* conclusions (see §4/§6), and
+   we are not certain we are feeding ZUNA data in the form it expects. Before we conclude anything
+   about the model, we would value Zyphra's guidance on preprocessing, input normalization, and
+   whether dense-montage inpainting + biomarker preservation is a use case ZUNA is suited to at all
+   (§8).
+
+> **Bottom line:** used the way we currently use it, ZUNA does not do what neither classical method
+> manages (preserve FAA within its reliability floor *and* match linear's fidelity). We want to know
+> whether that is a property of the model or of how we are driving it.
+
+---
+
+## 2. What we are evaluating, and why this framing
+
+This is a **use-case exploration**: our interest is less "can ZUNA reconstruct a waveform" and more
+"does ZUNA help for the EEG-derived psychological/clinical variables people actually report" — FAA
+first among them. "Reconstruct a missing channel" has no natural error scale in µV. Following our
+protocol
+(`BENCHMARK_PROTOCOL.md`), we grade reconstruction two ways that a scientist/clinician can act on:
+
+- **Fidelity** — temporal r, RMSE, SDR, spectral r, band-power error on the dropped channels.
+- **Biomarker preservation (the central test, §7.2 of the protocol)** — drop the channels a
+  biomarker is computed from, reconstruct, recompute the biomarker, and compare the induced error
+  to that biomarker's **natural test–retest variability**. A method "preserves" a biomarker if it
+  perturbs it *less than a real re-recording of the same person does*. The **same-day
+  (Rest1 vs Rest2) floor** is the primary margin.
+
+Biomarkers: **FAA** (Allen-style, on current-source-density / surface-Laplacian data:
+`ln(α F4) − ln(α F3)`, plus lateral `F7/F8`), **IAF** (posterior alpha centre-of-gravity),
+posterior α log-power, and aperiodic **1/f slope**.
+
+---
+
+## 3. How we drive ZUNA (please sanity-check this)
+
+For each case we build the `.pt` the dataloader expects and call `zuna.inference(...)`. The exact
+recipe (`benchmark/zuna_method.py`, mirroring the reference in `pipeline/load_data.py`):
+
+1. **Mask** dropped channels to 0.
+2. **Z-score** the preserved channels (mean/std over non-zero samples), storing `zscore_mean/std`
+   in metadata. Dropped channels stay 0.
+3. **Scale electrode positions** into ZUNA's ±0.12 bounding box (`0.119/max` if `max > 0.119`).
+4. Write `data`, `channel_positions`, `metadata` to `ds..._{n_ep:05d}_{n_ch}_{n_time}.pt`.
+5. `zuna.inference(data_norm=10.0, diffusion_sample_steps=50, tokens_per_batch=…)`. We cap
+   `target_packed_seqlen` (~8000 tokens) so the `flex_attention` mask fits a 12 GB GPU; epochs are
+   independent documents so packing is throughput-only.
+6. **Map the output back to microvolts by self-calibration:** we fit `truth ≈ a·Z + b` on the
+   *observed* channels (whose true µV we know) and apply `a·Z + b` to the dropped channels. We use
+   this instead of the stored z-score reversal because we could not verify ZUNA's internal
+   normalization offline. It is a clean fit (R² ≈ 0.955; §5), but **we would like to know whether
+   we should instead be reading ZUNA's native de-normalized output directly** (`data_norm` reversal),
+   and whether self-calibration biases anything.
+
+**Reference frame.** In Method B all methods reconstruct and are scored in a **bad-aware average
+reference** (mean over surviving channels, computed after dropout). This was a deliberate fix: a
+full average reference makes a dropped channel the exact negative sum of the survivors, so linear
+regression recovers it trivially (r ≈ 0.99) — an artifact, not skill.
+
+---
+
+## 4. Two preprocessing methods (we are unsure which is right for ZUNA)
+
+We include **both** pipelines because they embody different guesses about ZUNA's training
+distribution, and they are **not directly comparable**.
+
+| | **Method A** (`pipeline/`) | **Method B** (`benchmark/`) |
+|---|---|---|
+| Filter | **1–100 Hz band-pass** | **0.5 Hz high-pass, no low-pass** (broadband) |
+| Reference | **Average reference**, before dropout | **Bad-aware** average (survivors only), after dropout |
+| Scope | 1 subject / 1 session, 19→62 ch upsample | 5 subjects / 42 recordings, light-mask biomarker drop |
+| Baseline | spherical spline | **K=8 linear** (spline underperforms it here) |
+| Conclusion | *ZUNA beats spline* (fidelity) | *linear near-ceiling here; ZUNA misses primary FAA floor* |
+
+The tension is real and central to our request. ZUNA's docs say it was trained on
+**average-referenced 256 Hz** data with input normalized to **std ≈ 0.1** (hence `data_norm=10`
+after z-scoring). Method A matches "average reference"; Method B matches "broadband, feed the model
+what it saw" but uses the bad-aware reference for *scoring* fairness. **We do not know which the
+model actually prefers, nor whether the low-pass at 100 Hz (A) vs none (B) matters to ZUNA.**
+
+---
+
+## 5. Wrapper validation (the wiring is correct)
+
+Before trusting any number we validated the wrapper on `G001Day1Rest1` (drop F3/F4/F7/F8):
+
+| Check | Result | Meaning |
+|---|---|---|
+| Observed-channel alignment (raw ZUNA vs truth) | mean r **+0.923**, median +1.000, frac>0 **0.96** | no channel-permutation / flip / scale bug |
+| Self-calibration fit (good channels) | **R² = 0.955** (a≈294, b≈0.24) | µV mapping is a clean linear fit |
+| Good-channel hard-inpaint | exact | observed channels preserved |
+
+Per-dropped-channel on that recording: F3/F7 reconstruct well (α-band r +0.72 / +0.77), F4/F8
+poorly (−0.07 / −0.61) — a genuine per-channel property of the reconstruction, not a bug.
+
+> Note on amplitudes: Method-B preprocessing (no low-pass, no EMG removal) leaves the **truth** at a
+> median channel std ~327 µV (frontotemporal muscle + near-Nyquist content dominate broadband
+> variance). ZUNA's reconstruction tracks that scale; FAA is computed on **CSD alpha-band power**,
+> insulated from the broadband inflation, and truth biomarkers are physiological (FAA −0.16,
+> IAF 9.9 Hz).
+
+---
+
+## 6. Results
+
+### 6.1 Method A / phase 1 — single subject (`archive/Project_Overview_phase1.docx`)
+
+With 1–100 Hz + average reference on G001, ZUNA **out-performed spherical spline** on fidelity across
+random N-channel dropout (8 trials each):
+
+| Metric | N=2 | N=4 | N=8 |
+|---|---|---|---|
+| Temporal r — spline / **ZUNA** | 0.674 / **0.759** | 0.653 / **0.732** | 0.685 / **0.733** |
+| RMSE µV — spline / **ZUNA** | 3.13 / **2.69** | 4.16 / **3.17** | 4.29 / **4.23** |
+| SDR dB — spline / **ZUNA** | 3.40 / **4.04** | 1.79 / **3.27** | **4.29** / 3.42 |
+
+IAF was preserved by both (truth 10.379 → spline 10.369 → ZUNA 10.363 Hz). **Caveat:** single
+subject/session, and the comparator is **spline**, not the stronger K=8 linear baseline. This is the
+result that made ZUNA look promising — and that the 5-subject work below reframes.
+
+### 6.2 Method B / phase 2 — 5 subjects, 42 recordings
+
+**Waveform fidelity — linear-baseline study** (`results/linear_ceiling_confirmation.csv`,
+`results/cluster_sweep.csv`):
+linear-K8 r = **0.955 ± 0.053**, RMSE ≈ 11.6 µV, SDR ≈ 20 dB; consistent per-subject
+(0.942–0.964); linear beats spline in **96%** of condition-cells; and linear **does not degrade even
+at N=48/62 dropped** (r ≈ 0.95). In this regime, then, there is little bulk-waveform headroom for a
+learned prior to capture — though we have not swept montage density, band, or dropout pattern
+exhaustively, so this is a bounded claim about the conditions tested, not a general one.
+
+**Biomarker preservation vs same-day floor** (`results/zuna_eval_5subj.csv`, via
+`benchmark/aggregate.py`; 21 subject-days for the floor, 42 recon rows/method):
+
+| biomarker | same-day floor | linear | spline | **ZUNA** |
+|---|---|---|---|---|
+| **FAA (F3/F4)** | 0.208 | 0.311 · OVER | **0.185 · ok** | **0.228 · OVER** |
+| **FAA-lat (F7/F8)** | 0.301 | 0.321 · OVER | **0.260 · ok** | **0.221 · ok** |
+| IAF (Hz) | 0.138 | 0.073 · ok | 0.041 · ok | **0.383 · OVER** |
+| posterior-α | 0.459 | 0.313 · ok | 0.145 · ok | **0.468 · OVER** |
+| 1/f slope | 0.140 | 0.063 · ok | 0.071 · ok | **0.258 · OVER** |
+
+*ok = error below floor (preserved within test–retest reliability); OVER = exceeds it.*
+The linear/spline columns reproduce our pre-ZUNA baseline exactly, which validates the run.
+
+### 6.3 FAA per subject (why the mid-frontal miss is marginal)
+
+The mean-of-days floor mixes subjects with very different intrinsic FAA stability, so the aggregate
+FAA verdict is close:
+
+| subject | FAA floor | linear | spline | ZUNA |
+|---|---|---|---|---|
+| G001 | 0.357 | 0.276 | 0.131 | 0.324 |
+| G002 | 0.115 | 0.406 | 0.103 | 0.225 |
+| G003 | 0.099 | 0.237 | 0.340 | 0.108 |
+| G004 | 0.041 | 0.517 | 0.263 | 0.392 |
+| G005 | 0.390 | 0.126 | 0.102 | 0.066 |
+
+Where a subject's FAA is extremely stable day-to-day (G003/G004, floor ≤ 0.10), **even spline fails**
+— no reconstruction can match a biomarker that reproducible. On pooled **median** |error|, ZUNA
+(0.168) ≈ linear (0.154), with spline best (0.115).
+
+---
+
+## 7. Interpretation
+
+- **Fidelity:** classical local interpolation is a strong, hard-to-beat baseline on this dense
+  montage in the regime we tested (in-band, common-mode-free) — so raw-waveform recovery here is a
+  poor showcase for a learned prior. ZUNA's potential value is more likely in *derived structure*
+  (biomarkers, individuality) than in waveform RMSE. This is a statement about this regime, not a
+  claim that interpolation is universally optimal.
+- **FAA:** ZUNA clearly **beats linear** on both FAA measures and **passes the lateral floor**, but
+  **misses the primary mid-frontal floor** and does not match spline's clean preservation. So it does
+  not achieve the hoped "spline-like preservation *and* linear-like fidelity" both-worlds result.
+- **Posterior biomarkers:** ZUNA is the worst method — it perturbs IAF / posterior-α / 1/f slope
+  more than a re-recording does. It is **not** a general-purpose biomarker-preserving reconstructor
+  as currently driven.
+- **Preprocessing dependence:** the phase-1 (Method A) "ZUNA wins" and phase-2 (Method B) "ZUNA
+  misses" results differ in preprocessing, reference frame, subject count, *and* comparator. We
+  cannot cleanly attribute the flip, which is exactly why we want Zyphra's read on §8.
+
+---
+
+## 8. Open questions for Zyphra (the counsel we seek)
+
+1. **Preprocessing.** Which of our two pipelines is closer to ZUNA's training distribution — 1–100 Hz
+   band-pass (Method A) or 0.5 Hz high-pass, no low-pass broadband (Method B)? Does the presence/absence
+   of a low-pass at ~100 Hz materially affect reconstruction? Is average reference *required*, and does
+   our bad-aware reference (for scoring fairness) put data outside distribution?
+2. **Normalization / output scaling.** We z-score preserved channels and pass `data_norm=10.0`. We then
+   map ZUNA's output back to µV by **self-calibration** on observed channels rather than reversing the
+   stored z-score. Is that appropriate, or should we read ZUNA's native de-normalized output directly?
+   Are we handling the `data_norm` reversal correctly?
+3. **Geometry.** We scale electrode positions into a ±0.12 box. Are these the correct units/coordinate
+   frame, and does non-uniform scaling of a real 10–20 montage distort the 4D-RoPE geometry?
+4. **Masking convention.** We zero dropped channels and rely on the channel-position set to signal which
+   are present. Is zeroing the intended mask token, or should missing channels be *omitted* rather than
+   zeroed?
+5. **Sampling budget.** We use 50 diffusion steps and `diffusion_cfg=1.0`. Would more steps / CFG > 1
+   improve biomarker fidelity, particularly for right-frontal channels (F4/F8), which we reconstruct
+   worst?
+6. **Intended use.** Is dense-montage single-channel inpainting (few channels missing from 62) a regime
+   ZUNA is designed for, or is its value in sparse-montage upsampling / representation extraction? Is
+   "preserve a CSD-derived biomarker within same-day test–retest reliability" a reasonable success
+   criterion for the model?
+7. **Right-hemisphere frontal weakness.** Is the F4/F8 vs F3/F7 asymmetry we see (left reconstructs
+   well, right poorly, on some recordings) a known behaviour or a sign we are mis-specifying geometry
+   or reference?
+
+---
+
+## 9. Reproducibility
+
+- **Environment:** Python 3.10, torch 2.6.0+cu124, MNE ≥ 1.6, on an RTX 3080 Ti (12 GB). The 382M
+  model fits in 12 GB at ~3 GB peak with our token cap. `requirements.txt` lists the Python deps;
+  ZUNA itself (code + `Zyphra/ZUNA` weights) is an external dependency (§requirements).
+- **Headline commands:**
+  ```bash
+  # Method B, 5-subject biomarker evaluation (GPU for 'zuna'; ~6.5 min/inference)
+  python benchmark/biomarker_eval.py --subjects G001 G002 G003 G004 G005 \
+         --methods linear spline zuna --out results/zuna_eval_5subj.csv
+  python benchmark/aggregate.py --csv results/zuna_eval_5subj.csv
+  # Wrapper validation / diagnostics
+  python benchmark/_validate_zuna.py
+  python benchmark/_diag_zuna.py
+  ```
+  `biomarker_eval.py` is resumable by recording. Each ZUNA inference runs as an isolated subprocess,
+  so GPU memory is released between calls (no accumulation across the ~84 inferences).
+- **Data availability:** raw `.cnt` recordings are human EEG and are **not** included in this repo
+  (see `.gitignore`); they can be shared separately under agreement. The GEEG resting-state corpus is
+  a nested design (subject → 4+ days → Rest1/Rest2); this evaluation used subjects G001–G005.
+- **Results included:** `results/zuna_eval_5subj.csv` (+ `zuna_eval_G001.csv`) — Evaluation A rows
+  (truth + linear/spline/zuna recon, per biomarker); `results/linear_ceiling_confirmation.csv` and
+  `results/cluster_sweep.csv` — the linear-baseline fidelity studies; `results/figures/` — the PSD/alpha and
+  dropout-sweep summary plots.
+
+---
+
+## Appendix — repository map
+
+```
+README.md                 how to read/run this repo
+REPORT.md                 this document
+BENCHMARK_PROTOCOL.md     the frozen experimental protocol (design of record)
+requirements.txt
+pipeline/                 Method A — 1–100 Hz + average reference (proof-of-concept)
+benchmark/                Method B — 0.5 Hz HPF + bad-aware reference (current evaluation)
+results/                  result CSVs + key figures (no raw data / weights)
+archive/                  superseded single-subject scripts + phase-1 write-up
+```

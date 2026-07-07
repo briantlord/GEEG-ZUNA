@@ -1,0 +1,36 @@
+# --- data (human EEG; shared separately under agreement, never committed) ---
+GEEG_Raw/
+*.cnt
+*.fif
+
+# --- model weights / HF cache (ZUNA is pulled from HuggingFace: Zyphra/ZUNA) ---
+HF_cache/
+*.safetensors
+
+# --- large intermediate arrays / tensors ---
+*.npy
+*.pt
+*.npz
+
+# --- environments ---
+zuna_env/
+zuna_env_linux_backup/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# --- run outputs / logs / scratch ---
+*.log
+_pilot_out/
+_tmp_*/
+test_pt_out*/
+test_recon_pt/
+test_fif_out/
+tcache/
+inference_figures/
+
+# --- OS / editor ---
+.DS_Store
+*.tmp
+*.tmp.*

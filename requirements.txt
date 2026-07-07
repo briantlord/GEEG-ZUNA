@@ -1,0 +1,13 @@
+# Python 3.10 (tested). GPU run used torch 2.6.0+cu124 on an RTX 3080 Ti (12 GB).
+mne>=1.6.0
+numpy>=1.24.0
+scipy>=1.11.0
+torch>=2.5.1
+matplotlib>=3.8.0
+
+# ZUNA is NOT on PyPI. It is Zyphra's released package + weights:
+#   - code: the `zuna` package (vendored locally in the original tree under ./zuna/;
+#           omitted from this share since Zyphra owns it)
+#   - weights: auto-downloaded from HuggingFace repo "Zyphra/ZUNA"
+# The benchmark/ code imports `from zuna import inference`; point PYTHONPATH at the
+# zuna package and set HF_HOME to a local weights snapshot (or let it auto-download).
