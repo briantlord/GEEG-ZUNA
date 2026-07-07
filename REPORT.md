@@ -72,8 +72,12 @@ For each case we build the `.pt` the dataloader expects and call `zuna.inference
 recipe (`benchmark/zuna_method.py`, mirroring the reference in `pipeline/load_data.py`):
 
 1. **Mask** dropped channels to 0.
-2. **Z-score** the preserved channels (mean/std over non-zero samples), storing `zscore_mean/std`
-   in metadata. Dropped channels stay 0.
+2. **Z-score** the preserved channels with a **single global mean/std** pooled over all non-zero
+   samples (not per-channel), storing `zscore_mean/std` in metadata. Dropped channels stay 0. This
+   matches the paper's stated convention — *"z-score normalization based on the global mean and
+   standard deviation computed across all EEG channels within each recording"* (arXiv:2602.18478) —
+   and (as we confirmed) `data_norm=10.0` then divides this unit-variance input to the model's
+   expected std ≈ 0.1.
 3. **Scale electrode positions** into ZUNA's ±0.12 bounding box (`0.119/max` if `max > 0.119`).
 4. Write `data`, `channel_positions`, `metadata` to `ds..._{n_ep:05d}_{n_ch}_{n_time}.pt`.
 5. `zuna.inference(data_norm=10.0, diffusion_sample_steps=50, tokens_per_batch=…)`. We cap
@@ -85,6 +89,18 @@ recipe (`benchmark/zuna_method.py`, mirroring the reference in `pipeline/load_da
    normalization offline. It is a clean fit (R² ≈ 0.955; §5), but **we would like to know whether
    we should instead be reading ZUNA's native de-normalized output directly** (`data_norm` reversal),
    and whether self-calibration biases anything.
+
+**Why the normalization is safe for FAA, and where the real dependency lies.** Because the z-score
+is *global* (one scale for all channels), it cancels exactly in FAA's log-ratio —
+`ln(a²·P₄) − ln(a²·P₃) = ln(P₄) − ln(P₃)` — and the mean-subtraction only affects 0 Hz, outside the
+alpha band; both verified numerically. (A *per-channel* z-score would instead inject a bias of
+`2·ln(std₃/std₄)` and corrupt FAA; ZUNA and our wrapper both avoid this by using global stats.) So
+FAA does not depend on the normalization arithmetic, and alpha power — a Welch-PSD band integral, non-
+negative through the linear CSD transform — cannot go negative. The real dependency is **per-channel
+amplitude fidelity**: our self-calibration is a single global `(a,b)`, so a global amplitude error
+cancels in the ratio but a *channel-specific* one (e.g. systematically under-powered F4) passes
+straight through into FAA. That, not z-scoring, is the sensitive point, and it is why the F4/F8
+reconstruction weakness (§5) maps onto the FAA miss.
 
 **Reference frame.** In Method B all methods reconstruct and are scored in a **bad-aware average
 reference** (mean over surviving channels, computed after dropout). This was a deliberate fix: a
@@ -216,29 +232,43 @@ Where a subject's FAA is extremely stable day-to-day (G003/G004, floor ≤ 0.10)
 
 ## 8. Open questions for Zyphra (the counsel we seek)
 
-1. **Preprocessing.** Which of our two pipelines is closer to ZUNA's training distribution — 1–100 Hz
-   band-pass (Method A) or 0.5 Hz high-pass, no low-pass broadband (Method B)? Does the presence/absence
-   of a low-pass at ~100 Hz materially affect reconstruction? Is average reference *required*, and does
-   our bad-aware reference (for scoring fairness) put data outside distribution?
-2. **Normalization / output scaling.** We z-score preserved channels and pass `data_norm=10.0`. We then
-   map ZUNA's output back to µV by **self-calibration** on observed channels rather than reversing the
-   stored z-score. Is that appropriate, or should we read ZUNA's native de-normalized output directly?
-   Are we handling the `data_norm` reversal correctly?
-3. **Geometry.** We scale electrode positions into a ±0.12 box. Are these the correct units/coordinate
-   frame, and does non-uniform scaling of a real 10–20 montage distort the 4D-RoPE geometry?
-4. **Masking convention.** We zero dropped channels and rely on the channel-position set to signal which
-   are present. Is zeroing the intended mask token, or should missing channels be *omitted* rather than
-   zeroed?
-5. **Sampling budget.** We use 50 diffusion steps and `diffusion_cfg=1.0`. Would more steps / CFG > 1
-   improve biomarker fidelity, particularly for right-frontal channels (F4/F8), which we reconstruct
-   worst?
-6. **Intended use.** Is dense-montage single-channel inpainting (few channels missing from 62) a regime
-   ZUNA is designed for, or is its value in sparse-montage upsampling / representation extraction? Is
-   "preserve a CSD-derived biomarker within same-day test–retest reliability" a reasonable success
-   criterion for the model?
-7. **Right-hemisphere frontal weakness.** Is the F4/F8 vs F3/F7 asymmetry we see (left reconstructs
-   well, right poorly, on some recordings) a known behaviour or a sign we are mis-specifying geometry
-   or reference?
+Since drafting this we located the paper (Warner, Mago, Huml, Osman, Millidge, *"ZUNA: Flexible EEG
+Superresolution with Position-Aware Diffusion Autoencoders,"* arXiv:2602.18478, 9 Feb 2026), which
+resolves several preprocessing questions and sharpens others. The items below reflect that.
+
+1. **Reference frame (preprocessing largely resolved).** The paper specifies 0.5 Hz high-pass +
+   **common-average reference** + an adaptive 45 Hz–Nyquist notch, resampled to 256 Hz, with **no
+   low-pass** — which matches our **Method B** filtering, not Method A's 1–100 Hz band-pass. Our one
+   remaining deviation is the reference: we score in a **bad-aware** average (survivors only, so the
+   dropped channel does not leak as the negative sum of the others), whereas ZUNA trained on the full
+   common-average. Does reconstructing/scoring in the bad-aware frame put inputs meaningfully outside
+   the training distribution, and how would you recommend handling missing channels at inference?
+2. **Per-channel amplitude fidelity (the FAA-sensitive point).** Your global-per-recording z-score is
+   confirmed, so FAA's log-ratio is scale-invariant and robust to the normalization — good. But that
+   means FAA reconstruction rests entirely on **per-channel absolute alpha power**, which our single
+   global self-calibration (`a·Z + b`) cannot correct if the model has a channel-specific amplitude
+   bias (we see F4/F8 systematically under-reconstructed). Is there a recommended way to recover
+   per-channel absolute power from ZUNA's output (the intended de-normalization vs. a global rescale),
+   or is channel-wise amplitude simply not something the model is expected to preserve?
+3. **High-frequency consistency & anti-aliasing (underspecified in the paper).** With a 0.5 Hz
+   high-pass, no low-pass, geometry-only conditioning, and a 208-dataset corpus spanning many sample
+   rates and amplifiers, "high-frequency activity" is not a comparably-defined quantity across sources.
+   The paper describes *up*sampling low-rate recordings to 256 Hz but not how recordings acquired
+   **above** 256 Hz (e.g. TUH, high-density systems) were **decimated / anti-alias filtered**. (a) How
+   was that anti-aliasing done? (b) Given no acquisition-metadata conditioning, how consistent is the
+   learned representation above ~40 Hz, and can broadband HF input bleed into lower bands during
+   diffusion sampling? (c) Should we band-limit inputs to the range where the prior is well-defined?
+4. **Geometry.** We scale electrode positions into a ±0.12 box (`0.119/max` if `max > 0.119`). Are these
+   the correct units/coordinate frame, and does non-uniform scaling of a real 10–20 montage distort the
+   4D-RoPE geometry?
+5. **Masking convention.** We zero dropped channels and rely on the channel-position set to signal which
+   are present. Is zeroing the intended mask, or should missing channels be *omitted* rather than zeroed?
+6. **Sampling budget.** We use 50 diffusion steps and `diffusion_cfg=1.0`. Would more steps / CFG > 1
+   improve biomarker fidelity, particularly for the right-frontal channels (F4/F8) we reconstruct worst?
+7. **Intended use.** The paper frames ZUNA as EEG **super-resolution** (sparse → dense). Is
+   dense-montage single-channel inpainting (a few channels missing from 62) a regime it is designed for,
+   or is its value in sparse-montage upsampling / representation extraction? And is "preserve a
+   CSD-derived biomarker within same-day test–retest reliability" a reasonable success criterion?
 
 ---
 
