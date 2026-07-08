@@ -77,7 +77,7 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True):
         raw.drop_channels(drop)
 
     # ZUNA-matched: 0.5 Hz highpass, NO lowpass; notch line noise. (Average reference is
-    # applied later, per-condition, over surviving channels — see survivor_reference.)
+    # applied later, per-condition, over surviving channels — see surviving_average_reference.)
     raw.filter(l_freq=HPF, h_freq=None, fir_design='firwin', phase='zero', verbose=False)
     nyq = raw.info['sfreq'] / 2
     notches = [f for f in NOTCH if f < nyq - 1]
@@ -134,11 +134,12 @@ def make_drop_mask(ch_names, pos, n_drop, pattern, seed):
     raise ValueError(pattern)
 
 
-def bad_aware_reference(data, dropped):
-    """Bad-aware average reference: subtract the mean over GOOD (surviving) channels only.
+def surviving_average_reference(data, dropped):
+    """Average reference computed over the surviving (non-dropped) channels only.
 
-    The benchmark's evaluation frame (project decision). Removes the recording reference's
-    common-mode without leaking the dropped channel (it is not part of the average), giving an
+    The benchmark's evaluation frame (project decision). Subtracting the mean over only the
+    surviving channels removes the recording reference's common-mode without letting the dropped
+    channel leak into its own reference (it is excluded from the average), giving an
     apples-to-apples, common-mode-free comparison across all methods including ZUNA.
     Reconstruction and scoring both happen in this frame.
     """
@@ -345,7 +346,7 @@ def run_pilot(data_dir, out_dir, subjects, n_drops, patterns, trials, n_epochs, 
                 for tr in range(1, trials + 1):
                     s, seed = uid_seed(meta['subject'], meta['day'], meta['session'], n, pat, tr)
                     dropped = make_drop_mask(ch, pos, n, pat, seed)
-                    truth_ref = bad_aware_reference(truth, dropped)   # avg over GOOD channels
+                    truth_ref = surviving_average_reference(truth, dropped)   # avg over GOOD channels
                     bm_truth = biomarkers(truth_ref, ch)
                     for method in methods:
                         uid = f"{s}|{method}"
@@ -353,7 +354,7 @@ def run_pilot(data_dir, out_dir, subjects, n_drops, patterns, trials, n_epochs, 
                             continue
                         try:
                             t0 = time.time()
-                            rec = reconstruct(method, truth_ref, ch, pos, dropped)  # bad-aware frame
+                            rec = reconstruct(method, truth_ref, ch, pos, dropped)  # surviving-channel reference frame
                             fid = score_fidelity(truth_ref, rec, dropped)
                             bm_rec = biomarkers(rec, ch)
                             row = dict(**meta, n_drop=n, pattern=pat, trial=tr, method=method,

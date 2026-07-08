@@ -72,13 +72,13 @@ def main():
         if rec in done: continue
         meta = pilot.parse_meta(f); truth, ch, pos = load_truth(f)
         # (1) truth biomarkers on full montage (for the reliability floor)
-        bt_full = biomarkers(pilot.bad_aware_reference(truth, []), ch)
+        bt_full = biomarkers(pilot.surviving_average_reference(truth, []), ch)
         for bm, v in bt_full.items():
             w.writerow(dict(recording=rec, subject=meta['subject'], kind='truth', drop_set='-', method='-', biomarker=bm, truth=round(v, 5), value=round(v, 5), abs_err=0))
         # (2) reconstruction-induced biomarker error (light mask of biomarker-relevant channels)
         for dset, names in DROP_SETS.items():
             dd = pilot.idx_of(ch, names) if hasattr(pilot, 'idx_of') else [ [c.upper() for c in ch].index(n) for n in names if n in [c.upper() for c in ch] ]
-            ref = pilot.bad_aware_reference(truth, dd); bt = biomarkers(ref, ch)
+            ref = pilot.surviving_average_reference(truth, dd); bt = biomarkers(ref, ch)
             for m in a.methods:
                 try:
                     rc = (zuna_method.zuna_reconstruct(ref, ch, pos, dd) if m == 'zuna'

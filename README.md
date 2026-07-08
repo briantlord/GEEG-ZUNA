@@ -29,7 +29,7 @@ judged against those measures' natural test–retest reliability.
 | [`REPORT.md`](REPORT.md) | **Full findings report + questions for Zyphra** (read this first) |
 | [`BENCHMARK_PROTOCOL.md`](BENCHMARK_PROTOCOL.md) | Frozen experimental protocol (design of record) |
 | [`pipeline/`](pipeline/) | **Preprocessing Method A** — 1–100 Hz + average reference (proof-of-concept) |
-| [`benchmark/`](benchmark/) | **Preprocessing Method B** — 0.5 Hz HPF + bad-aware reference (current 5-subject evaluation) |
+| [`benchmark/`](benchmark/) | **Preprocessing Method B** — 0.5 Hz HPF + surviving-channel average reference (current 5-subject evaluation) |
 | [`results/`](results/) | Result CSVs + key figures (no raw data or model weights) |
 | [`archive/`](archive/) | Superseded single-subject exploration scripts + the phase-1 write-up |
 

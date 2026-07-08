@@ -19,7 +19,7 @@ NAMES = ['F3', 'F4', 'F7', 'F8']
 data, ch, pos = biomarker_eval.load_truth(F)
 up = [c.upper() for c in ch]
 dd = [up.index(n) for n in NAMES]
-ref = pilot.bad_aware_reference(data, dd)
+ref = pilot.surviving_average_reference(data, dd)
 
 dbg = {}
 print("running ZUNA (FAA drop set) ...", flush=True)

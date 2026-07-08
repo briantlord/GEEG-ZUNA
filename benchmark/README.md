@@ -1,4 +1,4 @@
-# benchmark/ — Preprocessing Method B (bad-aware reference, 0.5 Hz high-pass)
+# benchmark/ — Preprocessing Method B (surviving-channel average reference, 0.5 Hz high-pass)
 
 The **current evaluation harness** and the second of the two preprocessing methods. Implements
 `../BENCHMARK_PROTOCOL.md`. Runs the full ladder on CPU (every method except ZUNA) and drives the
@@ -7,7 +7,7 @@ ZUNA rung on GPU. **The GPU run is complete** — see `../REPORT.md` and `../res
 ## Preprocessing choices (Method B)
 - **Filter:** 0.5 Hz high-pass, **no low-pass** (feed ZUNA broadband, matching training), notch
   60/120/180 Hz, optional ICA muscle removal.
-- **Reference:** **bad-aware average reference** — mean over *surviving* channels only, applied
+- **Reference:** **surviving-channel average reference** — mean over *surviving* channels only, applied
   **after** dropout (so the dropped channel never enters its own reference; avoids the
   average-reference leakage that makes reconstruction trivially easy). All methods, incl. ZUNA,
   reconstruct and are scored in this frame.

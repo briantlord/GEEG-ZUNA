@@ -3,7 +3,7 @@
 Mirrors biomarker_eval exactly: preprocess G001Day1Rest1, drop the FAA channels
 (F3/F4/F7/F8), reconstruct with ZUNA, and report whether the reconstructed dropped
 channels have physiological amplitude (~5-40 uV) and positive temporal correlation
-to the truth channels (in the bad-aware reference frame the benchmark scores in).
+to the truth channels (in the surviving-channel average reference frame the benchmark scores in).
 """
 import sys, os, numpy as np
 # Point HF at the project-local cache (this project lives on C:, not the stale D:\ path the
@@ -28,7 +28,7 @@ print(f"preprocessed {F}")
 print(f"  data shape (n_ep, n_ch, n_time) = {data.shape}")
 print(f"  dropping {list(zip(NAMES, dd))}")
 
-ref = pilot.bad_aware_reference(data, dd)            # benchmark scoring frame
+ref = pilot.surviving_average_reference(data, dd)            # benchmark scoring frame
 print("  calling zuna_method.zuna_reconstruct ...", flush=True)
 rc = zuna_method.zuna_reconstruct(ref, ch, pos, dd)
 print(f"  recon shape = {rc.shape}")

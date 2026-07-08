@@ -54,7 +54,7 @@ def _stack(x):
 def zuna_reconstruct(data, ch_names, pos, dropped, gpu_device=0,
                      diffusion_sample_steps=50, data_norm=10.0, tokens_per_batch=None,
                      debug=None):
-    """data: (n_ep, n_ch, n_time) uV in the bad-aware frame. Returns same shape, dropped filled.
+    """data: (n_ep, n_ch, n_time) uV in the surviving-channel reference frame. Returns same shape, dropped filled.
 
     If `debug` is a dict, it is populated with the raw ZUNA output Z (model units) and the
     self-calibration coefficients (a, b) — for diagnostics only; the return value is unchanged.

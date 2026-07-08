@@ -102,8 +102,7 @@ cancels in the ratio but a *channel-specific* one (e.g. systematically under-pow
 straight through into FAA. That, not z-scoring, is the sensitive point, and it is why the F4/F8
 reconstruction weakness (§5) maps onto the FAA miss.
 
-**Reference frame.** In Method B all methods reconstruct and are scored in a **bad-aware average
-reference** (mean over surviving channels, computed after dropout). This was a deliberate fix: a
+**Reference frame.** In Method B all methods reconstruct and are scored in a **surviving-channel average reference** (mean over surviving channels, computed after dropout). This was a deliberate fix: a
 full average reference makes a dropped channel the exact negative sum of the survivors, so linear
 regression recovers it trivially (r ≈ 0.99) — an artifact, not skill.
 
@@ -117,7 +116,7 @@ distribution, and they are **not directly comparable**.
 | | **Method A** (`pipeline/`) | **Method B** (`benchmark/`) |
 |---|---|---|
 | Filter | **1–100 Hz band-pass** | **0.5 Hz high-pass, no low-pass** (broadband) |
-| Reference | **Average reference**, before dropout | **Bad-aware** average (survivors only), after dropout |
+| Reference | **Average reference**, before dropout | **Average over survivors only**, after dropout |
 | Scope | 1 subject / 1 session, 19→62 ch upsample | 5 subjects / 42 recordings, light-mask biomarker drop |
 | Baseline | spherical spline | **K=8 linear** (spline underperforms it here) |
 | Conclusion | *ZUNA beats spline* (fidelity) | *linear near-ceiling here; ZUNA misses primary FAA floor* |
@@ -125,7 +124,7 @@ distribution, and they are **not directly comparable**.
 The tension is real and central to our request. ZUNA's docs say it was trained on
 **average-referenced 256 Hz** data with input normalized to **std ≈ 0.1** (hence `data_norm=10`
 after z-scoring). Method A matches "average reference"; Method B matches "broadband, feed the model
-what it saw" but uses the bad-aware reference for *scoring* fairness. **We do not know which the
+what it saw" but uses the surviving-channel average reference for *scoring* fairness. **We do not know which the
 model actually prefers, nor whether the low-pass at 100 Hz (A) vs none (B) matters to ZUNA.**
 
 ---
@@ -239,9 +238,9 @@ resolves several preprocessing questions and sharpens others. The items below re
 1. **Reference frame (preprocessing largely resolved).** The paper specifies 0.5 Hz high-pass +
    **common-average reference** + an adaptive 45 Hz–Nyquist notch, resampled to 256 Hz, with **no
    low-pass** — which matches our **Method B** filtering, not Method A's 1–100 Hz band-pass. Our one
-   remaining deviation is the reference: we score in a **bad-aware** average (survivors only, so the
+   remaining deviation is the reference: we score in an **average over the surviving channels only** (so the
    dropped channel does not leak as the negative sum of the others), whereas ZUNA trained on the full
-   common-average. Does reconstructing/scoring in the bad-aware frame put inputs meaningfully outside
+   common-average. Does reconstructing/scoring in the surviving-channel reference frame put inputs meaningfully outside
    the training distribution, and how would you recommend handling missing channels at inference?
 2. **Per-channel amplitude fidelity (the FAA-sensitive point).** Your global-per-recording z-score is
    confirmed, so FAA's log-ratio is scale-invariant and robust to the normalization — good. But that
@@ -307,7 +306,7 @@ REPORT.md                 this document
 BENCHMARK_PROTOCOL.md     the frozen experimental protocol (design of record)
 requirements.txt
 pipeline/                 Method A — 1–100 Hz + average reference (proof-of-concept)
-benchmark/                Method B — 0.5 Hz HPF + bad-aware reference (current evaluation)
+benchmark/                Method B — 0.5 Hz HPF + surviving-channel average reference (current evaluation)
 results/                  result CSVs + key figures (no raw data / weights)
 archive/                  superseded single-subject scripts + phase-1 write-up
 ```
