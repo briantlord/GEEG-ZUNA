@@ -208,6 +208,36 @@ Where a subject's FAA is extremely stable day-to-day (G003/G004, floor ≤ 0.10)
 — no reconstruction can match a biomarker that reproducible. On pooled **median** |error|, ZUNA
 (0.168) ≈ linear (0.154), with spline best (0.115).
 
+### 6.4 Beyond FAA — a modular metric battery (classical baselines; ZUNA pass pending)
+
+FAA is one example of a class. We built a **modular metric-testing framework**
+(`benchmark/metrics/`) in which each psychophysiological metric is a self-registering plug-in scored
+by the same reliability-floor logic, so new metrics need no new script. Four more are implemented,
+each with its own 5-part development record (`requirements → plan → code → output → interpretation`
+under `benchmark/metrics/docs/<key>/`). Same 5 subjects / 21 days; **linear and spline run below; the
+ZUNA column awaits a GPU pass** (~5 drop sets × 42 recordings).
+
+| metric / submetric | floor | linear | spline |
+|---|---|---|---|
+| theta/beta ratio — Cz | 0.235 | 0.270 OVER | **0.123 ok** |
+| theta/beta ratio — Fz | 0.228 | 0.386 OVER | **0.154 ok** |
+| frontal-midline θ — Fz | 0.315 | 1.615 **OVER** | 0.332 OVER |
+| frontal-midline θ — relative | 0.132 | 1.615 OVER | 0.332 OVER |
+| mu asymmetry (C3/C4) | 0.305 | 0.326 OVER | **0.184 ok** |
+| mu power — C3 / C4 | 0.267 / 0.277 | 0.65 / 0.78 OVER | **0.19 / 0.18 ok** |
+| specparam — aperiodic exponent | 0.164 | **0.153 ok** | 0.183 OVER |
+| specparam — aperiodic offset | 0.199 | 0.349 OVER | 0.245 OVER |
+| specparam — alpha cf / pw / bw | — | **ok** | **ok** |
+
+Three patterns worth Zyphra's attention: (1) **spline is the classical method to beat** for most
+site-specific power/asymmetry metrics (theta/beta, mu) — mirroring FAA — while **linear collapses focal
+amplitude** (it flattens the reconstructed channel, e.g. mu C3/C4 error 0.65–0.78, and *catastrophically*
+smears frontal-midline θ, 1.6 ln-units). (2) **Frontal-midline theta is hard for both** classical
+methods — a genuine open target. (3) **The aperiodic offset is preserved by neither** classical method,
+so it is a place ZUNA could win outright, whereas the **posterior alpha peak (cf/pw/bw) is already robust**
+to both. The binding question in every row is the same as for FAA: can ZUNA get under the floor *and*
+beat the best classical method.
+
 ---
 
 ## 7. Interpretation

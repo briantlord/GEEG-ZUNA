@@ -23,6 +23,58 @@ judged against those measures' natural test–retest reliability.
 - Our two preprocessing pipelines reach opposite conclusions; we are unsure which matches ZUNA's
   training distribution. Details and the ask in [`REPORT.md`](REPORT.md).
 
+## What we are really testing (the vision)
+
+The test is **not** "does ZUNA reconstruct a waveform with low error." Classical interpolation already
+does that on a dense montage, and RMSE / temporal-correlation / SDR are **signal-processing
+abstractions with no inherent meaning** — a reconstruction can score well on them while smearing away
+the asymmetries, peak frequencies, and spatial structure that make EEG a window into affect, arousal,
+cognition, and pathology.
+
+What we care about is whether ZUNA, when it **"scales up" or repairs a recording, preserves — or even
+sharpens — the psychophysiologically/biologically meaningful quantities** that researchers and
+clinicians actually interpret. **Frontal alpha asymmetry (FAA)** is one sterling, easy-to-test example
+(a single, well-validated, spatially specific number with published test–retest reliability, trivially
+broken by dropping F3/F4/F7/F8). It is one member of a large family. For **every** candidate metric we
+ask two questions:
+
+- **Preservation** — drop the channels the metric is computed from, reconstruct, and check the value
+  stays inside its own **test–retest reliability floor** (the FAA protocol).
+- **Super-resolution / enhancement** — reconstruct a *sparse* montage up to dense and check whether the
+  metric lands *closer to the true dense-montage value* than geometry-only interpolation does. This is
+  the more ambitious "increase the resolution of a meaningful measure" claim.
+
+### Candidate metrics (catalog)
+
+Grouped by the spatial structure each one stresses. ✅ = implemented in the modular framework.
+
+| Group | Metric | Indexes | Channels it needs |
+|---|---|---|---|
+| Hemispheric asymmetry | **Frontal alpha asymmetry** ✅ | approach/withdrawal affect, depression risk | F3/F4, F7/F8 |
+| | Sensorimotor **mu asymmetry** ✅ | motor/somatosensory lateralization | C3/C4 |
+| | Posterior alpha asymmetry | spatial-attention bias | P3/P4, O1/O2 |
+| Spectral landmarks | Individual alpha frequency (IAF) | cognitive speed, aging, memory | posterior |
+| | **specparam peak parameters** ✅ (α center-freq / power / bandwidth, aperiodic exponent+offset) | true-oscillation vs 1/f background; E:I balance, arousal | posterior |
+| | θ–α transition frequency | memory/attention | frontal+posterior |
+| Regional power & ratios | **Theta/beta ratio** ✅ | attention/arousal; classic ADHD index | Cz/Fz |
+| | **Frontal midline theta** ✅ | cognitive control, working-memory load | Fz/FCz |
+| | Delta/alpha ratio (DAR) | clinical slowing (stroke, encephalopathy) | whole-scalp |
+| Connectivity / network | α/β phase connectivity (wPLI, PLV); graph metrics; **brainprint** identifiability | functional coupling, individual identity | multi-channel |
+| Whole-scalp / topographic | EEG **microstates** (A–D duration/coverage/transitions); source-space ROI power | large-scale dynamics, localization | full montage |
+
+Out of scope for this **resting-state** corpus (named so the boundary is explicit): ERP components
+(P300, MMN, ERN — need task data) and sleep spindles / slow oscillations (need sleep data).
+
+### Modular metric-testing framework
+
+Each metric is a **self-registering plug-in** (`benchmark/metrics/m_<key>.py`) implementing one common
+contract — a name, the channels to drop, and a `compute(data, ch_names) → {submetric: value}` function.
+A single generalized runner (`benchmark/metrics/run.py`) and aggregator (`aggregate.py`) then evaluate
+**every** registered metric against the same reliability-floor logic, grouping metrics that share a
+drop set so each reconstruction (including the expensive ZUNA pass) runs once. **Adding a new metric is
+a new module, not a new script.** Each metric ships a 5-part development record under
+`benchmark/metrics/docs/<key>/`: `requirements.md` → `plan.md` → code → `output` → `interpretation.md`.
+
 ## Layout
 | Path | What it is |
 |---|---|
