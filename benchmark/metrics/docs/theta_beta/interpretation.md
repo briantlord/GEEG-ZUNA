@@ -29,3 +29,9 @@ does not. The metric discriminates methods sharply.
 
 **5. The bar ZUNA must clear.** Error **< 0.235 (Cz)** and **< 0.228 (Fz)**, and to matter it must
 **beat spline's 0.123 / 0.154**. **ZUNA is not yet computed — pending the GPU pass.**
+
+## ZUNA (G001 sample)
+G001 5-day floor: tbr_cz 0.501, tbr_fz 0.462. ZUNA: tbr_cz **2.255**, tbr_fz **2.004** — catastrophic
+(~4-5x the floor), far worse than linear (0.437 / 1.030) and spline (0.043 / 0.348). TBR is a ratio of
+two bands at ONE channel, so ZUNA's poor spectral-shape reconstruction of the dropped midline channel
+wrecks it. Clear fail; spline is decisively the method to use.

@@ -34,3 +34,8 @@ lands directly, and `fmt_rel` inherits it undiluted.
 below spline's 0.332 to be the first method that matters here. Spline's clean median (0.087) shows this
 is reachable *if* the high-amplitude-day overshoots are tamed. **The ZUNA column is not yet computed and
 requires the GPU reconstruction pass before any verdict.**
+
+## ZUNA (G001 sample)
+G001 5-day floor: fmt_fz 0.543 (fmt_rel 0.160). ZUNA: **1.239** — OVER; better than linear (2.260) but
+far worse than spline (0.103). ZUNA does not rescue this hard metric — spline reconstructs Fz theta
+amplitude cleanly while ZUNA and linear both smear it.

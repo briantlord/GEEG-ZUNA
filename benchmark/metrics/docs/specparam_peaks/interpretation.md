@@ -46,3 +46,10 @@ Per submetric, error **< floor** and ideally **< best classical**:
 
 **ZUNA numbers are not yet computed** — the GPU reconstruction pass has not been run, so no ZUNA
 column exists in `metric_eval_5subj.csv`. This verdict is provisional until that pass lands.
+
+## ZUNA (G001 sample)
+G001 5-day floor / ZUNA error: aperiodic_exponent 0.264 / **0.807**, aperiodic_offset 0.359 / 0.382,
+alpha_cf 0.800 / **1.900 Hz**, alpha_pw 0.187 / **0.448**, alpha_bw 0.950 / 1.150 — ZUNA is OVER on ALL
+five and worse than both classical methods. Most telling: the posterior alpha peak frequency is off by
+~1.9 Hz and the 1/f exponent by 0.8 — ZUNA reconstructs the posterior spectral SHAPE poorly. The peak
+parameters that spline/linear preserved best are exactly where ZUNA fails hardest.

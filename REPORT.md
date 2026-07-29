@@ -208,14 +208,15 @@ Where a subject's FAA is extremely stable day-to-day (G003/G004, floor ≤ 0.10)
 — no reconstruction can match a biomarker that reproducible. On pooled **median** |error|, ZUNA
 (0.168) ≈ linear (0.154), with spline best (0.115).
 
-### 6.4 Beyond FAA — a modular metric battery (classical baselines; ZUNA pass pending)
+### 6.4 Beyond FAA — a modular metric battery
 
 FAA is one example of a class. We built a **modular metric-testing framework**
 (`benchmark/metrics/`) in which each psychophysiological metric is a self-registering plug-in scored
 by the same reliability-floor logic, so new metrics need no new script. Four more are implemented,
 each with its own 5-part development record (`requirements → plan → code → output → interpretation`
-under `benchmark/metrics/docs/<key>/`). Same 5 subjects / 21 days; **linear and spline run below; the
-ZUNA column awaits a GPU pass** (~5 drop sets × 42 recordings).
+under `benchmark/metrics/docs/<key>/`). The classical baselines (linear/spline) below are the full 5
+subjects / 21 days; the **ZUNA column is a G001 sample so far** (one subject, 5 days, 50 inferences),
+reported separately below because it uses G001's own — looser — floor.
 
 | metric / submetric | floor | linear | spline |
 |---|---|---|---|
@@ -237,6 +238,19 @@ methods — a genuine open target. (3) **The aperiodic offset is preserved by ne
 so it is a place ZUNA could win outright, whereas the **posterior alpha peak (cf/pw/bw) is already robust**
 to both. The binding question in every row is the same as for FAA: can ZUNA get under the floor *and*
 beat the best classical method.
+
+**ZUNA (G001 sample).** Running ZUNA through the same battery on G001 (all five drop sets, 50
+inferences) gives a clear, consistent verdict: **ZUNA is worse than spline on every metric, and clears
+its floor only on the two scale-invariant asymmetry ratios** (FAA, mu-asymmetry). Everything that
+depends on *absolute* band power or spectral *shape* fails, often grossly — theta/beta ≈ **2.0–2.3
+ln-units** (≈ 4–5× the floor; spline 0.04–0.35), the specparam **alpha peak frequency off by ≈ 1.9 Hz**
+and the **aperiodic exponent off by 0.8**, mu channel power 0.9–1.1 (spline 0.1–0.2), frontal-midline θ
+1.24 (spline 0.10). Because these errors are multiples of the floor, they fail any reasonable floor, not
+just G001's looser one. This is the sharpest corroboration of §3: ZUNA's **global** self-calibration
+preserves *ratios between homologous channels* (where its per-channel amplitude error cancels) but not
+*absolute power or spectral shape at a channel* — which is most of what these clinical metrics measure.
+A full 5-subject ZUNA pass would firm the numbers, but the pattern is already unambiguous. Data:
+`results/metric_eval_zuna_G001.csv`.
 
 ---
 

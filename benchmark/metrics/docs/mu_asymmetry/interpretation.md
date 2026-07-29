@@ -45,3 +45,9 @@ and, to matter, **beat the best classical method** — spline's 0.184 / 0.193 / 
 powers are the crux: this is exactly the absolute per-channel amplitude fidelity ZUNA missed on FAA's
 F4/F8. **ZUNA is not yet computed here** — the column is pending and requires the GPU pass; no mu
 verdict can be claimed until then.
+
+## ZUNA (G001 sample)
+G001 5-day floors: mu_asym 0.548, mu_c3 0.242, mu_c4 0.710. ZUNA: mu_asym **0.377** (ok — it passes the
+scale-invariant asymmetry) but mu_c3 **1.067** and mu_c4 **0.916** (both OVER, vs spline 0.124 / 0.231).
+A textbook illustration of the per-channel amplitude problem: ZUNA preserves the C4/C3 ratio while badly
+mis-scaling each channel's absolute mu power.

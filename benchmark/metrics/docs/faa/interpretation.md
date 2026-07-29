@@ -39,3 +39,11 @@ So FAA is a **split verdict**: ZUNA preserves and wins on the lateral pair but m
 mid-frontal floor. The miss traces to per-channel amplitude fidelity of reconstructed **F4/F8** (a
 residual relative bias), not to z-scoring — which cancels in this scale-invariant metric. No
 both-worlds win on FAA.
+
+## ZUNA (G001 sample)
+G001 5-day floor: faa 0.357, faa_lat 0.235. ZUNA: faa **0.324** (ok vs G001's loose floor), faa_lat
+**0.226** (ok). Consistent with the full 5-subject verdict: ZUNA passes the lateral pair but is
+marginal mid-frontal (it exceeds the tighter 5-subject faa floor of 0.208), and it does not beat
+spline (0.131 / 0.156) on either. FAA is a scale-invariant log-ratio, which is why ZUNA — whose
+per-channel amplitude fidelity is poor — still lands near the floor here while failing the
+absolute-power metrics below.
