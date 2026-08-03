@@ -53,14 +53,18 @@ def _stack(x):
 
 def zuna_reconstruct(data, ch_names, pos, dropped, gpu_device=0,
                      diffusion_sample_steps=50, data_norm=10.0, tokens_per_batch=None,
-                     debug=None):
+                     debug=None, inference_fn=None):
     """data: (n_ep, n_ch, n_time) uV in the surviving-channel reference frame. Returns same shape, dropped filled.
 
     If `debug` is a dict, it is populated with the raw ZUNA output Z (model units) and the
     self-calibration coefficients (a, b) — for diagnostics only; the return value is unchanged.
     """
     import torch
-    from zuna import inference
+    # Default: the vendored ZUNA 1.0 inference(). Pass inference_fn=... to run a different version
+    # (e.g. zuna_method_v11._inference_11 for ZUNA 1.1) with the harness otherwise held constant.
+    _inference = inference_fn
+    if _inference is None:
+        from zuna import inference as _inference
     tin, tout = tempfile.mkdtemp(prefix="zuna_in_"), tempfile.mkdtemp(prefix="zuna_out_")
     try:
         ne, nc, nt = data.shape
@@ -89,9 +93,9 @@ def zuna_reconstruct(data, ch_names, pos, dropped, gpu_device=0,
                            'zscore_mean': zmean, 'zscore_std': zstd}}
         torch.save(pt, os.path.join(tin, f"ds000000_000000_000000_d00_{ne:05d}_{nc}_{nt}.pt"))
         # 4. ZUNA inference (writes a .pt with the reconstruction under key 'data')
-        inference(input_dir=tin, output_dir=tout, gpu_device=gpu_device,
-                  data_norm=data_norm, diffusion_sample_steps=diffusion_sample_steps,
-                  tokens_per_batch=tokens_per_batch)
+        _inference(input_dir=tin, output_dir=tout, gpu_device=gpu_device,
+                   data_norm=data_norm, diffusion_sample_steps=diffusion_sample_steps,
+                   tokens_per_batch=tokens_per_batch)
         # weights_only=False: the output .pt holds numpy arrays (the reconstruction), which
         # torch 2.6's default weights_only=True refuses to unpickle. We wrote this file ourselves
         # this run, so it is trusted — same as main_pipeline.py's loads.

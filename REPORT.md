@@ -9,9 +9,12 @@ asymmetry).** Prepared to share privately with Zyphra to seek counsel on correct
 > 380M architecture, 4× more training, larger corpus, variable-length inputs, per-channel quality
 > scoring, and two preprocessing variants (0.1–45 Hz band-pass; 0.01 Hz HP + notch). Its headline
 > gains are on **waveform NMSE / regional reconstruction** (where it reports beating spline); it does
-> **not** evaluate biomarker/spectral-parameter preservation — the axis this report is about. A re-run
-> of the metric battery on 1.1 (harness held constant, model swapped) is **in progress**; §6.4 will be
-> updated with the 1.1 column.
+> **not** evaluate biomarker/spectral-parameter preservation — the axis this report is about. A 1.1
+> re-run of the metric battery is **built and prepared for the HPC** (`benchmark/zuna_method_v11.py`
+> via `reconstruct_fif`; `benchmark/slurm_zuna11_metrics.sh` + `benchmark/HPC_RUNBOOK_zuna11.md`) — the
+> harness is held constant and only the model is swapped. It runs on Linux where 1.1's `torch.compile`
+> works; on the local Windows box it falls back to eager (~8× slower) and is impractical at scale.
+> §6.4 will get the 1.1 column once the HPC pass completes.
 
 ---
 

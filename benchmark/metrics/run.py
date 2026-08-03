@@ -67,7 +67,15 @@ def main():
     ap.add_argument('--methods', nargs='+', default=['linear', 'spline'])
     ap.add_argument('--metrics', nargs='+', default=None, help='metric keys (default: all registered)')
     ap.add_argument('--out', default='results/metric_eval.csv')
+    ap.add_argument('--zuna-version', default='1.0', choices=['1.0', '1.1'],
+                    help="which ZUNA to run for the 'zuna' method (1.1 = pip `zuna` pkg / Zyphra/ZUNA1.1)")
+    ap.add_argument('--shard-index', type=int, default=0, help='this task index for a SLURM array (0-based)')
+    ap.add_argument('--shard-count', type=int, default=1, help='total number of array tasks (recordings are split across them)')
     a = ap.parse_args()
+
+    zmod = zuna_method
+    if a.zuna_version == '1.1':
+        import zuna_method_v11 as zmod
 
     reg = discover(a.metrics)
     if not reg:
@@ -96,6 +104,10 @@ def main():
     files = []
     for s in a.subjects:
         files += sorted(glob.glob(f'GEEG_Raw/{s}Day*.cnt'))
+    files = sorted(set(files))                       # deterministic order for stable sharding
+    if a.shard_count > 1:                            # SLURM array: this task owns every Nth recording
+        files = files[a.shard_index::a.shard_count]
+        print(f"[shard] {a.shard_index}/{a.shard_count}: {len(files)} recordings")
     for f in files:
         rec = os.path.basename(f)
         if rec in done:
@@ -127,7 +139,7 @@ def main():
                     print(f"  [truthframe:{m.key}] {rec}: {e}"); bt[m.key] = {}
             for method in a.methods:
                 try:
-                    rc = (zuna_method.zuna_reconstruct(ref, ch, pos, dd) if method == 'zuna'
+                    rc = (zmod.zuna_reconstruct(ref, ch, pos, dd) if method == 'zuna'
                           else pilot.reconstruct(method, ref, ch, pos, dd))
                 except Exception as e:
                     print(f"  [{method}] {rec} {label}: {e}"); continue

@@ -12,8 +12,10 @@ judged against those measures' natural test–retest reliability.
 > normalization, and whether this use case suits ZUNA.
 >
 > **Version:** results here are for **ZUNA 1.0** (`Zyphra/ZUNA`). **ZUNA 1.1** (`Zyphra/ZUNA1.1`,
-> arXiv:2607.27308) was released after this work; a 1.1 re-run of the metric battery (harness held
-> constant) is in progress. See the version note atop [`REPORT.md`](REPORT.md).
+> arXiv:2607.27308) was released after this work; a 1.1 re-run of the metric battery is **built and
+> prepared for the HPC** (`benchmark/zuna_method_v11.py`, `slurm_zuna11_metrics.sh`,
+> `HPC_RUNBOOK_zuna11.md`) — it runs on Linux where 1.1's `torch.compile` works. See the version note
+> atop [`REPORT.md`](REPORT.md).
 
 ## TL;DR of findings
 - For raw **waveform fidelity** on our dense 62-channel montage, classical **K=8 linear
