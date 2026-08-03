@@ -214,43 +214,35 @@ FAA is one example of a class. We built a **modular metric-testing framework**
 (`benchmark/metrics/`) in which each psychophysiological metric is a self-registering plug-in scored
 by the same reliability-floor logic, so new metrics need no new script. Four more are implemented,
 each with its own 5-part development record (`requirements → plan → code → output → interpretation`
-under `benchmark/metrics/docs/<key>/`). The classical baselines (linear/spline) below are the full 5
-subjects / 21 days; the **ZUNA column is a G001 sample so far** (one subject, 5 days, 50 inferences),
-reported separately below because it uses G001's own — looser — floor.
+under `benchmark/metrics/docs/<key>/`). All three methods below are the **full 5 subjects / 21 days**
+(`results/metric_eval_5subj_zuna.csv`).
 
-| metric / submetric | floor | linear | spline |
-|---|---|---|---|
-| theta/beta ratio — Cz | 0.235 | 0.270 OVER | **0.123 ok** |
-| theta/beta ratio — Fz | 0.228 | 0.386 OVER | **0.154 ok** |
-| frontal-midline θ — Fz | 0.315 | 1.615 **OVER** | 0.332 OVER |
-| frontal-midline θ — relative | 0.132 | 1.615 OVER | 0.332 OVER |
-| mu asymmetry (C3/C4) | 0.305 | 0.326 OVER | **0.184 ok** |
-| mu power — C3 / C4 | 0.267 / 0.277 | 0.65 / 0.78 OVER | **0.19 / 0.18 ok** |
-| specparam — aperiodic exponent | 0.164 | **0.153 ok** | 0.183 OVER |
-| specparam — aperiodic offset | 0.199 | 0.349 OVER | 0.245 OVER |
-| specparam — alpha cf / pw / bw | — | **ok** | **ok** |
+| metric / submetric | floor | linear | spline | ZUNA |
+|---|---|---|---|---|
+| theta/beta ratio — Cz | 0.235 | 0.270 OVER | **0.123 ok** | 1.311 OVER |
+| theta/beta ratio — Fz | 0.228 | 0.386 OVER | **0.154 ok** | 1.256 OVER |
+| frontal-midline θ — Fz | 0.315 | 1.615 OVER | 0.332 OVER | 0.896 OVER |
+| frontal-midline θ — relative | 0.132 | 1.615 OVER | 0.332 OVER | 0.896 OVER |
+| mu asymmetry (C3/C4 ratio) | 0.305 | 0.326 OVER | **0.184 ok** | **0.296 ok** |
+| mu power — C3 / C4 | 0.267 / 0.277 | 0.65 / 0.78 OVER | **0.19 / 0.18 ok** | 0.57 / 0.58 OVER |
+| specparam — aperiodic exponent | 0.164 | **0.153 ok** | 0.183 OVER | 0.583 OVER |
+| specparam — aperiodic offset | 0.199 | 0.349 OVER | 0.245 OVER | 0.319 OVER |
+| specparam — alpha cf | 0.381 | **0.185 ok** | **0.065 ok** | 1.321 OVER |
+| specparam — alpha pw / bw | 0.183 / 0.512 | **ok / ok** | **ok / ok** | 0.302 / 1.006 OVER |
+| FAA — F3/F4 · F7/F8 | 0.208 / 0.301 | OVER · OVER | **ok · ok** | 0.228 OVER · **0.221 ok** |
 
-Three patterns worth Zyphra's attention: (1) **spline is the classical method to beat** for most
-site-specific power/asymmetry metrics (theta/beta, mu) — mirroring FAA — while **linear collapses focal
-amplitude** (it flattens the reconstructed channel, e.g. mu C3/C4 error 0.65–0.78, and *catastrophically*
-smears frontal-midline θ, 1.6 ln-units). (2) **Frontal-midline theta is hard for both** classical
-methods — a genuine open target. (3) **The aperiodic offset is preserved by neither** classical method,
-so it is a place ZUNA could win outright, whereas the **posterior alpha peak (cf/pw/bw) is already robust**
-to both. The binding question in every row is the same as for FAA: can ZUNA get under the floor *and*
-beat the best classical method.
-
-**ZUNA (G001 sample).** Running ZUNA through the same battery on G001 (all five drop sets, 50
-inferences) gives a clear, consistent verdict: **ZUNA is worse than spline on every metric, and clears
-its floor only on the two scale-invariant asymmetry ratios** (FAA, mu-asymmetry). Everything that
-depends on *absolute* band power or spectral *shape* fails, often grossly — theta/beta ≈ **2.0–2.3
-ln-units** (≈ 4–5× the floor; spline 0.04–0.35), the specparam **alpha peak frequency off by ≈ 1.9 Hz**
-and the **aperiodic exponent off by 0.8**, mu channel power 0.9–1.1 (spline 0.1–0.2), frontal-midline θ
-1.24 (spline 0.10). Because these errors are multiples of the floor, they fail any reasonable floor, not
-just G001's looser one. This is the sharpest corroboration of §3: ZUNA's **global** self-calibration
-preserves *ratios between homologous channels* (where its per-channel amplitude error cancels) but not
-*absolute power or spectral shape at a channel* — which is most of what these clinical metrics measure.
-A full 5-subject ZUNA pass would firm the numbers, but the pattern is already unambiguous. Data:
-`results/metric_eval_zuna_G001.csv`.
+**The verdict (5 subjects, confirmed).** Counting passes against each submetric's floor: **spline
+preserves 10 of 14, linear 4, ZUNA just 2** — and ZUNA's two (lateral FAA, mu-asymmetry) are the
+**scale-invariant asymmetry ratios**. ZUNA is worse than spline on 13 of 14 submetrics (it edges spline
+only on lateral FAA, 0.221 vs 0.260). Everything that depends on *absolute* band power or spectral
+*shape* fails, often grossly: theta/beta ≈ **1.3 ln-units** (≈ 5–6× the floor; spline 0.12–0.15), the
+posterior **alpha peak frequency off ≈ 1.3** and **bandwidth off ≈ 1.0** (spline 0.07 / 0.20), the
+**aperiodic exponent off 0.58**, mu channel power ≈ 0.57 (spline ≈ 0.19), frontal-midline θ 0.90
+(spline 0.33). This is the sharpest corroboration of §3: ZUNA's **global** self-calibration preserves
+*ratios between homologous channels* (where its per-channel amplitude error cancels) but not *absolute
+power or spectral shape at a channel* — which is most of what these clinical metrics measure. Two
+secondary notes: **frontal-midline theta is hard for every method** (none reaches its floor — a genuine
+open target), and **the aperiodic offset is preserved by none**.
 
 ---
 
