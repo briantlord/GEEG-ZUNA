@@ -4,6 +4,15 @@
 centrally, the preservation of EEG-derived psychological/clinical measures (frontal alpha
 asymmetry).** Prepared to share privately with Zyphra to seek counsel on correct use of the model.
 
+> **Version note.** All results below are for **ZUNA 1.0** (`Zyphra/ZUNA`, arXiv:2602.18478). Zyphra
+> released **ZUNA 1.1** (`Zyphra/ZUNA1.1`, arXiv:2607.27308, July 2026) after this evaluation — same
+> 380M architecture, 4× more training, larger corpus, variable-length inputs, per-channel quality
+> scoring, and two preprocessing variants (0.1–45 Hz band-pass; 0.01 Hz HP + notch). Its headline
+> gains are on **waveform NMSE / regional reconstruction** (where it reports beating spline); it does
+> **not** evaluate biomarker/spectral-parameter preservation — the axis this report is about. A re-run
+> of the metric battery on 1.1 (harness held constant, model swapped) is **in progress**; §6.4 will be
+> updated with the 1.1 column.
+
 ---
 
 ## 1. Executive summary

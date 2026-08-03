@@ -10,6 +10,10 @@ judged against those measures' natural test–retest reliability.
 > **Start with [`REPORT.md`](REPORT.md)** — it summarizes the findings and lists the specific
 > questions we have for you (see §8). The open questions center on preprocessing, input
 > normalization, and whether this use case suits ZUNA.
+>
+> **Version:** results here are for **ZUNA 1.0** (`Zyphra/ZUNA`). **ZUNA 1.1** (`Zyphra/ZUNA1.1`,
+> arXiv:2607.27308) was released after this work; a 1.1 re-run of the metric battery (harness held
+> constant) is in progress. See the version note atop [`REPORT.md`](REPORT.md).
 
 ## TL;DR of findings
 - For raw **waveform fidelity** on our dense 62-channel montage, classical **K=8 linear
