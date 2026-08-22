@@ -30,7 +30,6 @@ INCLUDE_FILES = (
     "CODE_REMEDIATION_PLAN_2026-08-21.md",
     "COORDINATE_EVIDENCE_2026-08-21.md",
     "CNT_FORMAT_EVIDENCE_2026-08-21.md",
-    "ICA_REVIEW_NOTE_2026-08-21.md",
     "run_zuna11_local_one_record.ps1",
 )
 INCLUDE_DIRS = ("benchmark", "config")
@@ -49,10 +48,15 @@ def sha256(path: Path) -> str:
 
 def git_commit() -> str:
     try:
-        return subprocess.check_output(
+        commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
+        dirty = subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=ROOT, text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        return f"UNCOMMITTED@{commit}" if dirty else commit
     except (OSError, subprocess.CalledProcessError):
         return "UNCOMMITTED"
 

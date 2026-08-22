@@ -37,7 +37,6 @@ EPOCH_SAMPLES = int(PREPROCESSING_SPEC['epoch_seconds'] * SFREQ)
 HPF           = PREPROCESSING_SPEC['bandpass_hz'][0]
 LPF           = PREPROCESSING_SPEC['bandpass_hz'][1]
 N_EPOCHS_DEF  = PREPROCESSING_SPEC['target_epochs']
-MIN_CLEAN_EPOCHS = PREPROCESSING_SPEC['minimum_clean_epochs']
 AUX           = list(PREPROCESSING_SPEC['aux_channels'])
 EVENT_CODES   = list(PREPROCESSING_SPEC['event_codes'])
 BANDS = {                                              # broadband incl. high-gamma
@@ -50,67 +49,8 @@ NON_CORTICAL = {'M1', 'M2'}   # mastoids/reference-like: excluded from drop+scor
 
 
 # ----------------------------------------------------------------------------- stage 0
-def remove_artifacts(raw, strict=True):
-    """Deterministic ocular+muscle ICA; retain EOG channels until scoring."""
-    import mne
-    try:
-        ica = mne.preprocessing.ICA(
-            n_components=PREPROCESSING_SPEC['ica_components'], method='fastica',
-            max_iter=200, random_state=PREPROCESSING_SPEC['ica_random_state'], verbose=False)
-        ica.fit(raw, picks="eeg", verbose=False)
-        ocular = set()
-        ocular_scores = {}
-        for channel in (name for name in ("HEOG", "VEOG") if name in raw.ch_names):
-            bad, scores = ica.find_bads_eog(
-                raw, ch_name=channel,
-                threshold=PREPROCESSING_SPEC["ocular_threshold"],
-                measure=PREPROCESSING_SPEC["ocular_measure"], verbose=False,
-            )
-            ocular.update(int(index) for index in bad)
-            ocular_scores[channel] = np.asarray(scores, dtype=float).tolist()
-        muscle, muscle_scores = ica.find_bads_muscle(
-            raw, threshold=PREPROCESSING_SPEC["muscle_threshold"],
-            l_freq=PREPROCESSING_SPEC["muscle_band_hz"][0],
-            h_freq=PREPROCESSING_SPEC["muscle_band_hz"][1], verbose=False,
-        )
-        ica.exclude = sorted(ocular | {int(index) for index in muscle})
-        component_topographies = np.asarray(ica.get_components(), dtype=float).T
-        component_variance = np.asarray(ica.pca_explained_variance_, dtype=float)
-        ica.apply(raw, verbose=False)
-        return raw, {
-            "ocular_components": sorted(ocular),
-            "muscle_components": sorted(int(index) for index in muscle),
-            "ocular_scores": ocular_scores,
-            "muscle_scores": np.asarray(muscle_scores, dtype=float).tolist(),
-            "excluded_components": list(ica.exclude),
-            "excluded_fraction": float(len(ica.exclude) / ica.n_components_),
-            "n_components": int(ica.n_components_),
-            "ica_channel_names": list(ica.ch_names),
-            "component_topographies": component_topographies.tolist(),
-            "pca_explained_variance": component_variance.tolist(),
-            "muscle_threshold": PREPROCESSING_SPEC["muscle_threshold"],
-            "muscle_band_hz": PREPROCESSING_SPEC["muscle_band_hz"],
-            "ocular_threshold": PREPROCESSING_SPEC["ocular_threshold"],
-            "ocular_measure": PREPROCESSING_SPEC["ocular_measure"],
-        }
-    except Exception as e:
-        if strict:
-            raise RuntimeError(f"Required ocular/muscle ICA cleaning failed: {e}") from e
-        print(f"  [ica] artifact cleaning explicitly disabled after failure: {str(e)[:80]}")
-        return raw, {
-            "ocular_components": [], "muscle_components": [], "excluded_components": [],
-            "ocular_scores": {}, "muscle_scores": [], "excluded_fraction": 0.0,
-            "n_components": 0, "ica_channel_names": [],
-            "component_topographies": [], "pca_explained_variance": [],
-            "muscle_threshold": PREPROCESSING_SPEC["muscle_threshold"],
-            "muscle_band_hz": PREPROCESSING_SPEC["muscle_band_hz"],
-            "ocular_threshold": PREPROCESSING_SPEC["ocular_threshold"],
-            "ocular_measure": PREPROCESSING_SPEC["ocular_measure"],
-        }
-
-
 def _session_channel_qc(raw):
-    """QC the cropped analysis interval, not excluded raw-file edges."""
+    """Fail nonfinite data; otherwise record continuous-channel observations."""
     rows, failures = [], []
     for index, name in enumerate(raw.ch_names):
         values_uv = raw.get_data(picks=[index])[0] * 1e6
@@ -121,22 +61,18 @@ def _session_channel_qc(raw):
             rail_fraction = float(max(np.mean(values_uv == minimum), np.mean(values_uv == maximum)))
         else:
             std_uv, rail_fraction = float('nan'), 1.0
-        reasons = []
+        reasons, warning_reasons = [], []
         if not finite:
             reasons.append('nonfinite')
-        if finite and std_uv < PREPROCESSING_SPEC['session_flat_std_uv']:
-            reasons.append('flat')
-        if rail_fraction > PREPROCESSING_SPEC['session_rail_fraction_max']:
-            reasons.append('railed')
         max_abs_uv = float(np.max(np.abs(values_uv))) if finite else float('nan')
         max_jump_uv = float(np.max(np.abs(np.diff(values_uv)))) if finite and values_uv.size > 1 else 0.0
-        if finite and max_abs_uv > PREPROCESSING_SPEC['analysis_abs_max_uv']:
-            reasons.append('implausible_absolute_scale')
-        if finite and max_jump_uv > PREPROCESSING_SPEC['analysis_max_sample_jump_uv']:
-            reasons.append('discontinuity')
+        if finite and max_abs_uv > PREPROCESSING_SPEC['analysis_abs_warn_uv']:
+            warning_reasons.append('large_continuous_excursion')
+        if finite and max_jump_uv > PREPROCESSING_SPEC['analysis_max_sample_jump_warn_uv']:
+            warning_reasons.append('large_continuous_sample_jump')
         rows.append(dict(channel=name, std_uv=std_uv, rail_fraction=rail_fraction,
                          max_abs_uv=max_abs_uv, max_sample_jump_uv=max_jump_uv,
-                         passed=not reasons, reasons=reasons))
+                         passed=not reasons, reasons=reasons, warnings=warning_reasons))
         if reasons:
             failures.append(f"{name} ({'+'.join(reasons)})")
     return rows, failures
@@ -158,11 +94,92 @@ def _raw_tail_qc(raw, eeg_names, seconds):
     }
 
 
-def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
-               minimum_clean_epochs=MIN_CLEAN_EPOCHS):
-    """Load CNT and enforce corrected-v2 preprocessing and recording QC.
+def _auxiliary_channel_qc(raw, channel_names, eeg_names):
+    """Describe auxiliary signals without changing EEG or selecting epochs."""
+    eeg_data = raw.get_data(picks=eeg_names) * 1e6
+    eeg_centered = eeg_data - eeg_data.mean(axis=1, keepdims=True)
+    eeg_norm = np.linalg.norm(eeg_centered, axis=1)
+    rows = []
+    for name in channel_names:
+        values_uv = raw.get_data(picks=[name])[0] * 1e6
+        finite = bool(np.isfinite(values_uv).all())
+        centered = values_uv - np.mean(values_uv) if finite else values_uv
+        denominator = eeg_norm * np.linalg.norm(centered)
+        correlations = np.divide(
+            eeg_centered @ centered,
+            denominator,
+            out=np.full(len(eeg_names), np.nan, dtype=float),
+            where=denominator > 0,
+        ) if finite else np.full(len(eeg_names), np.nan, dtype=float)
+        strongest = sorted(
+            ({"eeg_channel": eeg_name, "pearson_r": float(value)}
+             for eeg_name, value in zip(eeg_names, correlations) if np.isfinite(value)),
+            key=lambda item: abs(item["pearson_r"]), reverse=True,
+        )[:10]
+        rows.append({
+            "channel": name,
+            "finite": finite,
+            "mean_uv": float(np.mean(values_uv)) if finite else None,
+            "std_uv": float(np.std(values_uv)) if finite else None,
+            "rms_uv": float(np.sqrt(np.mean(values_uv ** 2))) if finite else None,
+            "max_abs_uv": float(np.max(np.abs(values_uv))) if finite else None,
+            "maximum_absolute_eeg_correlation": (
+                float(max((abs(item["pearson_r"]) for item in strongest), default=np.nan))
+                if strongest else None
+            ),
+            "strongest_eeg_correlations": strongest,
+            "selection_role": "diagnostic_only",
+        })
+    return rows
+
+
+def _select_primary_epochs(candidate_data, n_epochs):
+    """Select source-valid epochs without amplitude-based artifact removal."""
+    candidate_data = np.asarray(candidate_data, dtype=np.float32)
+    peak_to_peak = np.ptp(candidate_data, axis=-1)
+    amplitude_qc_passed = np.all(
+        (peak_to_peak >= PREPROCESSING_SPEC['epoch_peak_to_peak_flat_uv'])
+        & (peak_to_peak <= PREPROCESSING_SPEC['epoch_peak_to_peak_max_uv']),
+        axis=1,
+    )
+    data = candidate_data[:n_epochs]
+    if data.shape[0] == 0:
+        raise RuntimeError("No source-annotation-accepted epochs are available")
+    return data, peak_to_peak, amplitude_qc_passed
+
+
+def _channel_amplitude_qc(data, ch_names):
+    """Describe per-channel epoch amplitude burden without classifying it."""
+    peak_to_peak = np.ptp(np.asarray(data, dtype=np.float32), axis=-1)
+    high_fraction = np.mean(
+        peak_to_peak > PREPROCESSING_SPEC['epoch_peak_to_peak_max_uv'], axis=0)
+    flat_fraction = np.mean(
+        peak_to_peak < PREPROCESSING_SPEC['epoch_peak_to_peak_flat_uv'], axis=0)
+    return [
+        {
+            "channel": name,
+            "selected_epoch_count": int(data.shape[0]),
+            "high_amplitude_epoch_count": int(np.sum(
+                peak_to_peak[:, index] > PREPROCESSING_SPEC['epoch_peak_to_peak_max_uv'])),
+            "flat_epoch_count": int(np.sum(
+                peak_to_peak[:, index] < PREPROCESSING_SPEC['epoch_peak_to_peak_flat_uv'])),
+            "high_amplitude_epoch_fraction": float(high_fraction[index]),
+            "flat_epoch_fraction": float(flat_fraction[index]),
+            "role": "descriptive_only_no_classification_or_exclusion",
+        }
+        for index, name in enumerate(ch_names)
+    ]
+
+
+def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF):
+    """Load CNT and build minimally processed primary benchmark truth.
 
     Returns dict: data (n_ep, n_ch, 1280) float32 µV, ch_names, pos (n_ch,3), meta.
+
+    This path deliberately performs no ICA, component subtraction, or automatic
+    amplitude-based epoch rejection. Amplitude flags are recorded for later
+    stratified QC, but they do not change which source-annotation-accepted epochs
+    enter the primary truth tensor.
     """
     import mne
     mne.set_log_level("ERROR")
@@ -170,6 +187,7 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
     raw = mne.io.read_raw_cnt(
         cnt_path, preload=True, data_format=PREPROCESSING_SPEC['cnt_data_format'])
     original_sfreq = float(raw.info['sfreq'])
+    original_n_times = int(raw.n_times)
 
     auxiliary_types = {}
     for channel in ("HEOG", "VEOG"):
@@ -208,24 +226,8 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
     if channel_failures:
         raise RuntimeError("Cropped analysis-interval channel QC failed: " + ", ".join(channel_failures))
 
-    artifact_components = {
-        "ocular_components": [], "muscle_components": [], "excluded_components": [],
-        "ocular_scores": {}, "muscle_scores": [], "excluded_fraction": 0.0,
-        "n_components": 0, "ica_channel_names": [],
-        "component_topographies": [], "pca_explained_variance": [],
-        "muscle_threshold": PREPROCESSING_SPEC["muscle_threshold"],
-        "muscle_band_hz": PREPROCESSING_SPEC["muscle_band_hz"],
-        "ocular_threshold": PREPROCESSING_SPEC["ocular_threshold"],
-        "ocular_measure": PREPROCESSING_SPEC["ocular_measure"],
-    }
-    if emg:
-        raw, artifact_components = remove_artifacts(raw, strict=True)
-    elif PREPROCESSING_SPEC['emg_required']:
-        warnings.warn(
-            "EMG cleaning explicitly disabled: output is development-only and cannot enter "
-            "the corrected benchmark.", RuntimeWarning)
-
     drop_aux = [channel for channel in AUX if channel in raw.ch_names]
+    auxiliary_channel_qc = _auxiliary_channel_qc(raw, drop_aux, analysis_eeg.ch_names)
     if drop_aux:
         raw.drop_channels(drop_aux)
 
@@ -245,27 +247,21 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
     epochs = mne.Epochs(raw, sel, tmin=0, tmax=tmax, baseline=None,
                         preload=True, reject_by_annotation=True, verbose=False)
     candidate_data = epochs.get_data(copy=True).astype(np.float32) * 1e6
-    peak_to_peak = np.ptp(candidate_data, axis=-1)
-    clean = np.all(
-        (peak_to_peak >= PREPROCESSING_SPEC['epoch_peak_to_peak_flat_uv'])
-        & (peak_to_peak <= PREPROCESSING_SPEC['epoch_peak_to_peak_max_uv']),
-        axis=1,
-    )
-    clean_indices = np.flatnonzero(clean)
-    data = candidate_data[clean_indices[:n_epochs]]
-    if data.shape[0] < minimum_clean_epochs:
-        raise RuntimeError(
-            f"Recording QC failed: retained {data.shape[0]} clean epochs; "
-            f"minimum is {minimum_clean_epochs}")
+    data, peak_to_peak, amplitude_qc_passed = _select_primary_epochs(
+        candidate_data, n_epochs)
     if data.shape[2] != EPOCH_SAMPLES or not np.isfinite(data).all():
         raise RuntimeError(f"Invalid Stage-0 tensor shape/values: {data.shape}")
     pos = epochs.get_montage().get_positions()['ch_pos']
     ch_names = epochs.ch_names
+    channel_amplitude_qc = _channel_amplitude_qc(data, ch_names)
     pos_arr = np.array([pos[c] for c in ch_names], dtype=np.float32)
 
     accepted_selected = {int(selected_index): accepted_index
                          for accepted_index, selected_index in enumerate(epochs.selection)}
-    final_accepted = {int(index): order for order, index in enumerate(clean_indices[:n_epochs])}
+    final_selected = {
+        accepted_index: accepted_index
+        for accepted_index in range(min(n_epochs, len(candidate_data)))
+    }
     selected_lookup = {event_index: selected_index
                        for selected_index, event_index in enumerate(selected_event_indices)}
     event_descriptions = {value: key for key, value in eid.items()}
@@ -273,7 +269,7 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
     for event_index, row in enumerate(ev):
         selected_index = selected_lookup.get(event_index)
         accepted_index = None if selected_index is None else accepted_selected.get(selected_index)
-        final_order = None if accepted_index is None else final_accepted.get(accepted_index)
+        final_order = None if accepted_index is None else final_selected.get(accepted_index)
         record = {
             "event_index": int(event_index),
             "raw_sample_estimate": int(round(float(row[0]) * original_sfreq / SFREQ)),
@@ -283,7 +279,7 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
             "annotation_description": event_descriptions.get(int(row[2]), "UNKNOWN"),
             "nonoverlap_selected": selected_index is not None,
             "annotation_accepted": accepted_index is not None,
-            "amplitude_flat_accepted": None if accepted_index is None else bool(clean[accepted_index]),
+            "amplitude_qc_passed": None if accepted_index is None else bool(amplitude_qc_passed[accepted_index]),
             "peak_to_peak_min_uv": None if accepted_index is None else float(np.min(peak_to_peak[accepted_index])),
             "peak_to_peak_max_uv": None if accepted_index is None else float(np.max(peak_to_peak[accepted_index])),
             "final_selected_order": None if final_order is None else int(final_order),
@@ -293,14 +289,24 @@ def preprocess(cnt_path, n_epochs=N_EPOCHS_DEF, emg=True,
                 meta=dict(
                     protocol_id=PROTOCOL_ID,
                     preprocessing_sha256=PREPROCESSING_SHA256,
+                    original_sfreq_hz=original_sfreq,
+                    original_n_times=original_n_times,
+                    original_duration_seconds=float((original_n_times - 1) / original_sfreq),
                     n_epochs=int(data.shape[0]), n_ch=len(ch_names), sfreq=SFREQ,
-                    bandpass_hz=[HPF, LPF], emg_cleaning=bool(emg),
-                    artifact_components=artifact_components,
+                    requested_maximum_epochs=int(n_epochs),
+                    available_source_valid_epochs=int(len(candidate_data)),
+                    epoch_count_policy=PREPROCESSING_SPEC['epoch_count_policy'],
+                    bandpass_hz=[HPF, LPF],
+                    component_removal="none", ica_applied=False,
                     epoch_candidates=int(len(sel)),
                     epochs_after_annotations=int(len(candidate_data)),
-                    epochs_rejected_amplitude_or_flat=int(np.sum(~clean)),
-                    minimum_clean_epochs=int(minimum_clean_epochs),
+                    candidate_epochs_flagged_amplitude_or_flat=int(np.sum(~amplitude_qc_passed)),
+                    selected_epochs_flagged_amplitude_or_flat=int(
+                        np.sum(~amplitude_qc_passed[:data.shape[0]])),
+                    channel_amplitude_qc=channel_amplitude_qc,
+                    epoch_amplitude_policy=PREPROCESSING_SPEC['epoch_amplitude_policy'],
                     analysis_interval_channel_qc=channel_qc,
+                    auxiliary_channel_qc=auxiliary_channel_qc,
                     raw_tail_qc=raw_tail_qc,
                     event_qc=event_qc,
                 ))
@@ -524,7 +530,7 @@ def uid_seed(subject, day, session, n, pattern, trial):
 LADDER = ['zero', 'mean', 'nearest', 'linear', 'spline', 'mne']   # + 'zuna' on HPC
 
 
-def run_pilot(data_dir, out_dir, subjects, n_drops, patterns, trials, n_epochs, methods, emg=True):
+def run_pilot(data_dir, out_dir, subjects, n_drops, patterns, trials, n_epochs, methods):
     os.makedirs(out_dir, exist_ok=True)
     man = Manifest(os.path.join(out_dir, 'manifest.jsonl'))
     csv_path = os.path.join(out_dir, 'metrics.csv')
@@ -544,7 +550,7 @@ def run_pilot(data_dir, out_dir, subjects, n_drops, patterns, trials, n_epochs, 
         key = os.path.basename(f)
         if key not in cache:
             t0 = time.time()
-            cache[key] = preprocess(f, n_epochs=n_epochs, emg=emg)
+            cache[key] = preprocess(f, n_epochs=n_epochs)
             tru = cache[key]
             print(f"[stage0] {key}: {tru['meta']} in {time.time()-t0:.1f}s")
         tru = cache[key]

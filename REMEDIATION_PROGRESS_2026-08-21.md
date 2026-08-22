@@ -1,172 +1,102 @@
 # GEEG-ZUNA remediation progress — 2026-08-21
 
-This is the execution ledger for `CODE_REMEDIATION_PLAN_2026-08-21.md`. It is
-derived from changes and tests in the actual working tree. It does not reuse the
-abandoned phase labels.
+This ledger describes the current uncommitted working tree. No ZUNA inference
+was run during this remediation.
 
 ## Current verdict
 
-Remediation is in progress. The project is substantially safer, but ZUNA model
-execution and the full HPC array remain blocked. No new ZUNA inference was run
-during this remediation work.
+The active Stage-0 path is minimally processed, no-ICA EEG. Epoch count,
+amplitude burden, and specparam fit statistics are descriptive observations;
+they do not classify channels or exclude otherwise readable recordings.
 
-## Completed
+The earlier 31/42 “eligible cohort” conclusion is withdrawn. It resulted from
+two unjustified exclusions: requiring all recordings to supply 64 epochs and
+rejecting a complete recording when one channel crossed a post-hoc amplitude
+frequency threshold. The earlier cohort output remains historical diagnostic
+data only and must not be used as an eligibility list.
 
-### Authoritative source/release boundary
+## Active Stage-0 behavior
 
-- Initialized a root Git repository and committed the audited source baseline as
-  `5e4c6a7120ccc44b48e2f5e417c93cc21effac4b` using the authenticated GitHub
-  no-reply identity for `briantlord`.
-- Added ignore rules for raw EEG, model weights, environments, caches, results,
-  generated releases, and archives.
-- Declared `benchmark/` authoritative and made `GEEG-ZUNA-share/` generated.
-- Preserved the old hand-maintained share under
-  `archive/handmaintained_share_2026-08-21`.
-- Preserved the vendored ZUNA 1.0 package and stale executables under
-  `archive/legacy_active_tree_2026-08-21`.
-- Removed the project-root `zuna` import collision. The active-tree check now
-  resolves ZUNA to the pinned virtual-environment package.
-- Hard-blocked the legacy `pilot.py` CLI and removed the permissive old ZUNA
-  audit from the active release.
-- Added a deterministic release builder and per-file SHA-256 release manifest.
-  The current generated share contains 66 files and no legacy `pipeline/` or
-  vendored ZUNA package. An independent exact verifier rejects missing, extra,
-  size-mismatched, hash-mismatched, or non-canonical release content. The current
-  verified source-content hash is
-  `d8856bfa964e44f87fb4a016377e15b8e131eeb80ed782ebbc35cf55e35c5726`.
+- Protocol ID: `geeg-zuna-minimal-stage0-v1`.
+- Read CNT as int32, map the positioned 62-channel montage, apply one 0.5–45 Hz
+  zero-phase FIR, resample to 256 Hz, crop continuous edges, and construct
+  non-overlapping marker-locked 5-second epochs.
+- Perform no ICA, component fitting, component subtraction, channel
+  interpolation, or amplitude-based waveform cleaning.
+- HEOG, VEOG, and EKG are descriptive auxiliary channels only and are excluded
+  before the EEG tensor is formed.
+- Use available source-annotation-accepted epochs up to the maximum requested by
+  the run. Record requested, available, and selected counts.
+- Record per-epoch and per-channel flatness and >300 µV peak-to-peak
+  measurements without classifying channels, rejecting epochs, or rejecting
+  recordings.
+- Record continuous-channel standard deviation, railing fraction, maximum
+  amplitude, and maximum sample jump without quality-based exclusion; nonfinite
+  samples remain a genuine processing error.
+- Persist specparam fit status, R², mean absolute error, posterior-channel count,
+  detected-peak count, and alpha-peak count without an acceptance threshold.
+- Keep Stage 0 unreferenced. Apply the surviving non-mastoid average reference
+  only after a drop set is declared, identically to truth and reconstruction.
 
-### Scientific/result identity
+## Fresh G001 verification
 
-- Added `config/scientific_contract_v1.json` and a hashed experiment ID.
-- Truth, reconstruction error, and test-retest floors are now defined in the
-  same drop-set-specific surviving-channel reference frame.
-- M1/M2 remain observed model context but are excluded from reference
-  contributors, drop targets, and metric channels.
-- Every reconstruction result points to a deterministic matching truth-unit ID.
-- Rows carry the experiment, contract, run, Stage-0, metric/config, common
-  spectral code, runner, QC, schema, and aggregator hashes.
-- The aggregator rejects mixed runs/contracts/provenance, mismatched truth
-  frames, missing truth links, no reconstruction methods, and zero paired floors.
+The current release-identity Stage-0 entry is:
 
-### Stage-0
+`results/stage0_cache_v4/G001Day1Rest1__b5c248899ca549004a01`
 
-- QC now describes the cropped analysis interval rather than the corrupted raw
-  footer/tail.
-- Raw-tail QC is stored separately with an explicit warning.
-- HEOG/VEOG remain available through ICA; ocular and muscle component indices
-  and scores are recorded before auxiliary channels are removed.
-- A complete event ledger records raw-sample estimate, resampled sample, onset,
-  code, non-overlap selection, annotation acceptance, amplitude decision,
-  peak-to-peak range, and final selected order.
-- Stage-0 cache v3 hashes the data array, positions, and channel list and has a
-  standalone verifier plus inspectable lock ownership.
-- A real current-source non-model build on `G001Day1Rest1.cnt` completed and
-  independently verifies: 64 x 62 x 1280, cache key
-  `0251e6c90ed7a28ba2f88e34df460ca0d886be3a07f7821dfc44ef80f1071a53`.
-  It records full component scores/topographies and warns on the abnormal raw
-  footer/tail. The earlier `bb301f...` smoke is source-stale by design.
-- The ICA review generator produces a 20-row reviewer table with detector
-  labels/scores, strongest topography channels, PCA variance, and blank review
-  fields. The current automatic policy still excludes 14/20 components and
-  remains a release blocker rather than silently passing.
+- cache key:
+  `b5c248899ca549004a011d62d556241f166e804e62ce50f5a08f0b5f069fb668`
+- 76 source-valid epochs available;
+- requested maximum 64;
+- selected 64;
+- tensor shape 64 × 62 × 1280, float32, at 256 Hz;
+- `ica_applied=false`;
+- standalone cache verification passed;
+- all full-recording and 8-epoch-block truth metrics finite; and
+- ZUNA inference run: false.
 
-### ZUNA adapter and execution identity
+Truth-only evidence is under:
 
-- The adapter requires a typed verified Stage-0 object; naked arrays are rejected.
-- Position arrays and discrete bins are part of cache identity.
-- Coordinate handling now exactly documents and replicates the pinned official
-  tokenizer. Original `standard_1005` head coordinates, componentwise-clipped
-  model coordinates, and 100-bin XYZ tokens are all stored and hashed. Nine
-  channels saturate the current montage's Z token, but all 62 full XYZ triplets
-  remain unique; any future token collision fails before inference.
-- Hybrid output is canonical and masked full/hybrid values must match.
-- Normalized dropped output is stored separately from physical calibration.
-- Three explicit blind calibration inputs are implemented and content-addressed:
-  whole-montage median survivor SD, four-nearest-survivor median SD, and a
-  fixed-penalty observed-position log-SD ridge model. All three are invariant to
-  arbitrary changes in held-target waveforms in regression tests. The selected
-  strategy is frozen in the run manifest and verified against every successful
-  ZUNA reconstruction manifest.
-- The helper runs Hugging Face offline, verifies revision/weight/config before
-  and after inference, preserves scheduler GPU/SLURM state, and uses a
-  per-process rendezvous port.
-- Direct hidden-waveform invariance, exact observed-channel restoration, mask,
-  boundary, cache-tamper, coordinate rejection, and position-key tests pass.
-- Model inputs and outputs now live in the content-addressed unit directory
-  before inference starts. Every epoch's full FIF, hybrid FIF, and mask are
-  independently read and verified.
-- A failed helper attempt preserves verified epochs, records completed and
-  missing/invalid epoch indices, and retries only missing/invalid epochs.
-- An atomic cache-unit lock records key, host, PID, and acquisition time and
-  refuses concurrent ownership without deleting an unknown lock.
-- An injected interruption after epoch 1 of a two-epoch test resumes by
-  submitting only epoch 2 and then completes successfully.
+`results/truth_qc_v4_G001Day1Rest1_no_exclusion_gates_final`
 
-### Expected-unit validation and HPC structure
+## ZUNA adapter safeguards retained
 
-- The immutable run manifest hashes exact recording paths/sizes/content,
-  methods, model, sources, pair structure, result units, reconstruction units,
-  and array mapping.
-- The frozen 42-recording spline+ZUNA design requires exactly 1,764 result units
-  and 420 reconstruction/QC units.
-- The bundle validator rejects missing/extra/duplicate/mixed units and verifies
-  successful ZUNA units used the exact model, 50 diffusion steps, and 64 epochs.
-- HPC tasks map one-to-one to immutable manifest entries. The launcher uses an
-  explicit interpreter and exact run-ID approval. The collector requires every
-  exact shard and replaces wildcard concatenation with validated atomic output.
-- Before computation, each selected expected unit is atomically registered as
-  `preempted_incomplete`. Durable successes remove that state; caught model,
-  QC, metric, and input failures replace it with the specific terminal state.
-- Failure ledgers are retry-safe: a later failure replaces the prior state and
-  a durable success clears it. Mixed run IDs and success/failure overlaps fail.
-- The collector now requires and merges the exact status shard for every task.
-  Complete bundles may report failures without dropping them from denominators;
-  the validator still supports a stricter all-success gate.
-- Machine result rows retain full Python floating-point representations instead
-  of rounding to six decimals.
-- Reconstruction QC v2 persists per-epoch/per-dropped-channel mean, SD, RMS,
-  1-45 Hz power, power ratio, maximum amplitude, flatness, clipping fraction,
-  waveform correlation, and log-spectral RMSE.
-- Successful specparam rows persist fit status, posterior-channel count,
-  R-squared, mean absolute error, detected-peak count, and alpha-peak count.
+- The adapter requires a typed, verified Stage-0 object.
+- Held-target waveforms, means, and standard deviations do not enter model input
+  construction or physical-scale strategy selection.
+- Original coordinates, official clipped coordinates, discrete tokens, masks,
+  normalized outputs, and physical outputs are recorded and content-addressed.
+- Verified per-epoch reconstructions are preserved; retries submit only missing
+  or invalid epochs.
+- Observed-channel restoration, masking, boundary checks, cache-tamper
+  rejection, hidden-waveform invariance, coordinate identity, and interruption
+  recovery have regression coverage.
+- Every expected result unit must receive an explicit terminal state; failures
+  cannot silently disappear during collection.
 
-## Verification completed
+## Verification status
 
-- 23 CPU regression tests pass.
-- The same 23 tests pass from the generated HPC share with bytecode writes
-  disabled, and exact release verification still passes afterward.
-- All edited Python files compile.
-- Active-tree/import check passes.
-- The current generated release excludes known legacy executables.
-- A deliberately incomplete result bundle is rejected.
-- The real Stage-0 smoke described above completed without invoking ZUNA.
-- Comparing the new Stage-0 tensor with the prior tensor showed 0.809 retained
-  1-45 Hz power, 0.975 retained alpha power, and samplewise correlation 0.847.
+- 27/27 authoritative CPU regression tests pass.
+- The same 27/27 tests pass from the generated HPC share.
+- JSON configuration validation passes.
+- Edited Python source compiles.
+- Fresh G001 Stage-0 standalone verification passes.
+- Fresh G001 truth-only metric QC passes.
+- Both generated shares pass exact verification: 68 files, content hash
+  `6ff12a634e5b4577eeba925b21d6e30a492ba3bc9ec47928e1c2c046cc84d1dd`,
+  source identity `UNCOMMITTED@a55931837c968b56fe0349e98b48f35b1dcf43ce`.
+- No ZUNA inference was run.
 
-## Blocking decisions/evidence still required
+The current `GEEG-ZUNA-share` and `dist/GEEG-ZUNA-share` directories are
+byte-identical corrected builds. Previous shares containing withdrawn gates
+have been superseded.
 
-1. Independent CNT/int32 acquisition-format evidence.
-2. Independent review of the aggressive ICA decision. The prior pipeline marked
-   13/20 components as muscle; ocular detection adds one unique component, for
-   14/20 excluded in the current recording.
-3. Calibration sensitivity results for all predeclared
-   physical-scale strategies.
-4. A frozen specparam fit-quality rule. Fit diagnostics are now persisted.
+## Remaining controlled work
 
-## Implementation still incomplete
+1. Inspect the final diff and confirm no withdrawn gate remains active.
+2. Do not commit or push without explicit authorization.
+3. Do not run ZUNA until explicitly requested after this correction is reviewed.
 
-- The physical-scale calibration alternatives are implemented but have not been
-  evaluated with production 50-step output. The current median-survivor carrier
-  remains only a development primary, not a released choice.
-- Specparam fit diagnostics are persisted, but the minimum acceptable R-squared
-  threshold remains deliberately unfrozen and therefore blocks release.
-- Determinism at the production 50-step setting has not been measured.
-- The rebuilt HPC path has not had the required two-task same-node systems test.
-
-## Next implementation order
-
-1. Resolve or externally escalate the CNT-format, ICA, and specparam-threshold
-   decisions.
-2. Only then run one epoch at 50 steps and execute the frozen calibration and
-   determinism sensitivities; do not start the full recording or HPC
-   array until each subsequent validation gate passes.
+Independent CNT acquisition/export evidence and production 50-step ZUNA
+physical-scale sensitivity/determinism evidence remain unresolved. They are not
+replaced by automatic recording exclusions.

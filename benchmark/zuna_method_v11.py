@@ -168,8 +168,8 @@ def _validate_inputs(stage0, dropped):
     ch_names = list(stage0.ch_names)
     pos = np.asarray(stage0.pos)
     manifest = stage0.manifest
-    if manifest.get("schema") != "geeg-zuna-stage0-cache-v3":
-        raise RuntimeError("ZUNA requires a verified Stage-0 v3 manifest")
+    if manifest.get("schema") != "geeg-zuna-stage0-cache-v4":
+        raise RuntimeError("ZUNA requires a verified Stage-0 v4 manifest")
     identity = manifest.get("identity", {})
     if identity.get("protocol_id") != PROTOCOL_ID or identity.get("preprocessing_sha256") != PREPROCESSING_SHA256:
         raise RuntimeError("Stage-0 identity does not match the active remediated protocol")

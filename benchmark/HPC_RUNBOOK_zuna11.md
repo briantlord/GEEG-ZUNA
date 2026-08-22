@@ -87,5 +87,7 @@ After every exact shard exists:
 ```
 
 The collector refuses missing, stale, unknown, mixed-run, incomplete, non-50-step,
-non-64-epoch, or model-mismatched shards and writes a checksummed bundle manifest.
-
+epoch-empty, over-requested-epoch, or model-mismatched shards and writes a
+checksummed bundle manifest. A readable recording may contribute fewer epochs
+than the requested maximum; its actual Stage-0 and reconstruction shapes must
+match.

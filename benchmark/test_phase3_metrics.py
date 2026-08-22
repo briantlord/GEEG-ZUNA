@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -79,6 +80,20 @@ class Phase3MetricsTest(unittest.TestCase):
         metric = m_specparam_peaks.METRIC
         with self.assertRaisesRegex(ValueError, "non-finite"):
             run.metric_values(metric, np.zeros((2, 6, 1280)), metric.drop_channels)
+
+    def test_specparam_fit_diagnostics_are_persisted_without_threshold_gate(self):
+        metric = m_specparam_peaks.METRIC
+        values = {key: 1.0 for key in metric.submetrics}
+        diagnostics = {
+            "fit_status": "success", "posterior_channel_count": 6,
+            "r_squared": 0.89, "mean_absolute_error": 0.1,
+            "detected_peak_count": 1, "alpha_peak_count": 1,
+        }
+        with mock.patch.object(metric, "evaluate", return_value=(values, diagnostics)):
+            converted, diagnostics_json = run.metric_evaluation(
+                metric, np.zeros((1, 6, 1280)), metric.drop_channels)
+        self.assertEqual(converted, values)
+        self.assertIn('"r_squared":0.89', diagnostics_json)
 
     def test_oracle_label_is_unambiguous(self):
         self.assertEqual(classify_method("linear_oracle"), "oracle")

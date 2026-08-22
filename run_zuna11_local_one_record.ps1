@@ -75,7 +75,7 @@ $Arguments = @(
     "--zuna-calibration", "median_survivor_std_zero_mean_carrier",
     "--run-manifest", $RunManifest,
     "--task-index", "0",
-    "--stage0-cache-dir", (Join-Path $ProjectRoot "results\stage0_cache_v3"),
+    "--stage0-cache-dir", (Join-Path $ProjectRoot "results\stage0_cache_v4"),
     "--out", $Output,
     "--qc-out", $QcOutput,
     "--status-out", $StatusOutput
@@ -85,7 +85,7 @@ Write-Host ""
 Write-Host "Prepared local ZUNA 1.1 run"
 Write-Host "  Recording: G001Day1Rest1.cnt"
 Write-Host "  Metrics:   $($Metrics -join ', ')"
-Write-Host "  Methods:   spline, ZUNA 1.1 remediated-v1"
+Write-Host "  Methods:   spline, ZUNA 1.1 with minimal no-ICA Stage 0"
 Write-Host "  Run manifest: $RunManifest"
 Write-Host "  Output:    $Output"
 Write-Host "  Failures:  $StatusOutput"

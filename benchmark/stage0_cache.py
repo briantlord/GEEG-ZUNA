@@ -1,4 +1,4 @@
-"""Content-addressed Stage-0 truth cache for the remediated protocol."""
+"""Content-addressed Stage-0 truth cache for the minimal no-ICA protocol."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ except ImportError:  # Script execution from benchmark/
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CACHE_ROOT = ROOT / "results" / "stage0_cache_v3"
+DEFAULT_CACHE_ROOT = ROOT / "results" / "stage0_cache_v4"
 
 
 def sha256_array(array: np.ndarray) -> str:
@@ -90,8 +90,7 @@ def _source_hashes() -> dict[str, str]:
     return {name: sha256_file(path) for name, path in paths.items()}
 
 
-def build_identity(cnt_path: str | os.PathLike[str], n_epochs: int,
-                   minimum_clean_epochs: int, emg: bool) -> dict[str, object]:
+def build_identity(cnt_path: str | os.PathLike[str], n_epochs: int) -> dict[str, object]:
     raw_path = Path(cnt_path).resolve()
     if not raw_path.is_file():
         raise FileNotFoundError(raw_path)
@@ -101,9 +100,7 @@ def build_identity(cnt_path: str | os.PathLike[str], n_epochs: int,
         "preprocessing_sha256": PREPROCESSING_SHA256,
         "raw_sha256": sha256_file(raw_path),
         "raw_bytes": raw_stat.st_size,
-        "target_epochs": int(n_epochs),
-        "minimum_clean_epochs": int(minimum_clean_epochs),
-        "emg_cleaning": bool(emg),
+        "requested_maximum_epochs": int(n_epochs),
         "source_sha256": _source_hashes(),
         "package_versions": _package_versions(),
     }
@@ -123,7 +120,7 @@ def _load_verified(entry: Path, expected_identity: dict[str, object]):
     if not manifest_path.is_file() or not tensor_path.is_file():
         raise RuntimeError(f"Incomplete Stage-0 cache entry requires inspection: {entry}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema") != "geeg-zuna-stage0-cache-v3":
+    if manifest.get("schema") != "geeg-zuna-stage0-cache-v4":
         raise RuntimeError(f"Unsupported Stage-0 cache schema: {entry}")
     if manifest.get("status") != "complete" or manifest.get("identity") != expected_identity:
         raise RuntimeError(f"Stage-0 cache identity/status mismatch: {entry}")
@@ -177,22 +174,18 @@ def verify_entry(entry: str | os.PathLike[str], verify_raw: bool = True):
 
 
 def load_or_create(cnt_path: str | os.PathLike[str], cache_root: str | os.PathLike[str] | None = None,
-                   n_epochs: int = PREPROCESSING_SPEC["target_epochs"],
-                   minimum_clean_epochs: int = PREPROCESSING_SPEC["minimum_clean_epochs"],
-                   emg: bool = True):
-    """Return verified truth data and manifest, creating a v3 cache on a miss."""
-    if PREPROCESSING_SPEC["emg_required"] and not emg:
-        raise ValueError("Remediated production Stage-0 requires ocular/muscle ICA")
+                   n_epochs: int = PREPROCESSING_SPEC["target_epochs"]):
+    """Return verified minimally processed truth, creating a v4 cache on a miss."""
     raw_path = Path(cnt_path).resolve()
     root = Path(cache_root or os.environ.get("GEEG_STAGE0_CACHE_DIR", DEFAULT_CACHE_ROOT)).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    identity = build_identity(raw_path, n_epochs, minimum_clean_epochs, emg)
+    identity = build_identity(raw_path, n_epochs)
     key = str(identity["cache_key_sha256"])
     entry = _entry_path(root, raw_path, key)
 
     if entry.exists():
         loaded = _load_verified(entry, identity)
-        print(f"[stage0 v3 cache] hit -> {entry}", flush=True)
+        print(f"[stage0 v4 cache] hit -> {entry}", flush=True)
         return loaded
 
     lock = root / f".{key}.lock"
@@ -215,9 +208,7 @@ def load_or_create(cnt_path: str | os.PathLike[str], cache_root: str | os.PathLi
         if staging.exists():
             raise RuntimeError(f"Refusing occupied Stage-0 staging path: {staging}")
         staging.mkdir()
-        result = pilot.preprocess(
-            str(raw_path), n_epochs=n_epochs, emg=emg,
-            minimum_clean_epochs=minimum_clean_epochs)
+        result = pilot.preprocess(str(raw_path), n_epochs=n_epochs)
         data = np.ascontiguousarray(result["data"], dtype=np.float32)
         ch_names = [str(name) for name in result["ch_names"]]
         pos = np.ascontiguousarray(result["pos"], dtype=np.float32)
@@ -232,7 +223,7 @@ def load_or_create(cnt_path: str | os.PathLike[str], cache_root: str | os.PathLi
         )
         os.replace(temporary_tensor, tensor_path)
         manifest = {
-            "schema": "geeg-zuna-stage0-cache-v3",
+            "schema": "geeg-zuna-stage0-cache-v4",
             "status": "complete",
             "created_at": datetime.now(timezone.utc).astimezone().isoformat(),
             "raw_path": str(raw_path),
@@ -264,7 +255,7 @@ def load_or_create(cnt_path: str | os.PathLike[str], cache_root: str | os.PathLi
             # A race can only be accepted after independently verifying the winner.
             shutil.rmtree(staging)
         loaded = _load_verified(entry, identity)
-        print(f"[stage0 v3 cache] created -> {entry}", flush=True)
+        print(f"[stage0 v4 cache] created -> {entry}", flush=True)
         return loaded
     finally:
         if staging.exists():

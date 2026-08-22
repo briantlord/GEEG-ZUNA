@@ -1,5 +1,11 @@
 # ICA artifact-cleaning review note — 2026-08-21
 
+> **Historical audit evidence only.** The ICA-based Stage-0 path was withdrawn
+> on 2026-08-21. Active primary protocol `geeg-zuna-minimal-stage0-v1` performs
+> no ICA or component subtraction, and Stage-0 cache v4 cannot reuse these v3
+> outputs. This note documents why the discarded path was unacceptable; it is
+> not an active review gate.
+
 ## Current verdict
 
 Production remains blocked. The current automatic policy removes 14 of 20 ICA

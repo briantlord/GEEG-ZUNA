@@ -19,7 +19,18 @@ This is a **pre-analysis plan**. Its purpose is to fix every analytic decision �
 
 The document is organized as: rationale and hypotheses (§1–2), data and design (§3–5), outcome measures (§6), the analysis plan including the three signature analyses — reliability-grounded equivalence, fingerprinting, and regression-to-the-mean (§7), the statistical and power/sampling plan (§8–9), and the practical compute and pipeline-scaling plan (§10). Deliverables, validity threats, and appendices follow.
 
-**Decision log (v0.6; Phase 3 metric correctness).** The broadband/no-lowpass v0.3 decision is superseded by `PHASE1_CORRECTED_PROTOCOL.md`. All methods receive one **0.5–45 Hz** bandpass before resampling. Stage-0 data are not average-referenced; reference is computed after dropout over surviving channels. Production preprocessing requires deterministic EMG cleaning, QC, at least 48 clean epochs, and content-addressed provenance. The masking-aware ZUNA adapter in `PHASE2_ZUNA_INTEGRATION.md` serializes each real epoch separately, replaces held-out samples with truth-free calibration carriers, disables ZUNA's second filter/reference pass, verifies the official mask, and removes post-hoc self-calibration. `PHASE3_METRIC_CORRECTNESS.md` replaces the false dependency-free “specparam” approximation with pinned official specparam, requires exact finite metric outputs and complete drop sets, freezes pre-score physiological reconstruction gates, and introduces a corrected-only v3 result schema. High-gamma above 45 Hz is not evaluated. The in-sample linear ridge reconstruction is available only as an explicitly labeled oracle and is excluded from primary aggregate tables by default. The production HPC array remains gated until the Phase 4 execution gate passes.
+**Current amendment (2026-08-21).** `PHASE1_CORRECTED_PROTOCOL.md` is the
+authoritative Stage-0 definition and supersedes every ICA/EMG-component-removal
+requirement elsewhere in this historical plan. Primary truth receives one
+0.5–45 Hz bandpass, resampling, edge crop, and marker epoching, with **no ICA,
+no component subtraction, and no amplitude-based epoch selection**. Stage-0 is
+not average-referenced; the observed-channel reference is computed only after
+dropout. Cache v4 makes earlier ICA-cleaned Stage-0 tensors incompatible.
+
+The masking-aware ZUNA adapter in `PHASE2_ZUNA_INTEGRATION.md` serializes each
+real epoch separately, replaces held-out samples with truth-free calibration
+carriers, disables ZUNA's second filter/reference pass, verifies the official
+mask, and removes post-hoc self-calibration. Production execution remains gated.
 
 ### 0.2 Pilot findings (v0.4) — required amendments
 
@@ -114,7 +125,9 @@ The GEEG corpus is a **private dataset collected by John Allen's laboratory** an
 Per-recording QC, applied identically to all methods and decided **before** dropout:
 
 1. Successful load and montage match (62 channels present, positions resolved in `standard_1005`).
-2. Minimum retained clean epochs after filtering and artifact rejection (threshold: ≥ 48 of 64 epochs; recordings below are excluded and logged).
+2. Use available source-annotation-valid marker epochs up to the run's requested
+   maximum. Record requested, available, and selected counts. Amplitude
+   measurements are descriptive and do not select epochs or exclude recordings.
 3. No channel flat/railed across the whole session (such channels are "naturally bad"). The *eligible-to-drop* and *scored* pools also **exclude non-cortical electrodes** (M1/M2 mastoids and any reference-like channels), which interpolate pathologically (Pilot Finding B, §0.2).
 4. Reference and sampling-rate integrity (average reference applied; sfreq = 256 Hz confirmed — guards against the historical `sfreq=250` bug).
 
@@ -131,10 +144,15 @@ All methods receive **identically preprocessed** input; the only difference betw
 3. Do not apply a separate notch: 60 Hz and its harmonics are outside the retained 0.5–45 Hz band.
 4. Resample / confirm **256 Hz** after band-limiting.
 5. **Average reference** — applied **after** channel dropout, over the surviving channels (Pilot Finding A, §0.2), *not* here in Stage 0; referencing over all 62 first leaks the dropped channel as the exact negative sum of the rest. (Required because ZUNA trained on average-referenced data.)
-6. **EMG control:** remove muscle components deterministically with the frozen ICA procedure before epoch selection. This step is required and fails closed in production.
+6. **No component removal:** ICA, ocular-component subtraction, and
+   muscle-component subtraction are forbidden in primary Stage 0.
 7. Edge-artifact crop.
-8. Epoch into **64 × 5.0 s** non-overlapping segments (≈ 5.3 min of the ~6 min recording), marker-locked to resting-state event codes (every 0.5 s) to avoid artifact-contaminated periods.
-9. Export ground-truth tensors (shape **64 × 62 × 1280**, float32).
+8. Epoch into up to **64 × 5.0 s** non-overlapping segments, marker-locked to
+   resting-state event codes. Record flatness and >300 µV flags without using
+   them to choose the primary epochs.
+9. Export ground-truth tensors (shape **N × 62 × 1280**, float32), where N is
+   the number available up to the requested maximum. The immediate
+   G001Day1Rest1 run requests 64 because that recording contains at least 64.
 10. **ZUNA normalization** uses the Phase 2 blind adapter: held-out samples are discarded, and each missing channel receives a masked deterministic carrier whose inverse scale is the epoch's median surviving-channel standard deviation. Held-out samples, means, standard deviations, and reference waveform do not participate.
 
 The released FIF tokenization/inference path is used only after the Phase 2 adapter has removed held-out samples. Its filter and average-reference steps are disabled, and every real epoch is a separate FIF, preserving discontinuities.

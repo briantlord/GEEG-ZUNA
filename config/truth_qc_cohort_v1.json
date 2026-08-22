@@ -1,0 +1,25 @@
+{
+  "schema": "geeg-zuna-truth-qc-cohort-v1",
+  "status": "descriptive_truth_qc_no_quality_exclusion_thresholds",
+  "recording_set": {
+    "subjects": ["G001", "G002", "G003", "G004", "G005"],
+    "expected_recordings": 42,
+    "filename_pattern": "G###Day#Rest#.cnt"
+  },
+  "analysis_policy": {
+    "requested_maximum_epochs_per_recording": 64,
+    "epoch_count": "use_available_source-valid_epochs_up_to_requested_maximum",
+    "channel_amplitude": "descriptive_only_no_classification_or_exclusion",
+    "specparam_fit": "persist_diagnostics_without_threshold_based_exclusion",
+    "eight_epoch_blocks": "descriptive_only"
+  },
+  "cnt_descriptive_checks": {
+    "reader_data_format": "int32",
+    "required_original_sfreq_hz": 1000.0,
+    "required_stage0_channels": 62,
+    "required_stage0_sfreq_hz": 256,
+    "required_samples_per_epoch": 1280,
+    "event_spacing_seconds": "record_without_threshold_based_exclusion"
+  },
+  "failure_policy": "retain and report genuine processing errors; QC measurements do not exclude a readable recording"
+}

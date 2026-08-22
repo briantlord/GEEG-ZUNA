@@ -36,10 +36,15 @@ CALIBRATION_STRATEGIES = [
 
 def git_commit() -> str:
     try:
-        return subprocess.check_output(
+        commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
+        dirty = subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=ROOT, text=True, stderr=subprocess.DEVNULL,
+        ).strip()
+        return f"UNCOMMITTED@{commit}" if dirty else commit
     except (OSError, subprocess.CalledProcessError):
         return "UNCOMMITTED"
 
@@ -106,7 +111,7 @@ def expected_units(recordings: list[dict], methods: list[str]):
                     "recording": recording["recording"],
                     "method": method,
                     "drop_set": drop_set,
-                    "expected_epochs": 64,
+                    "requested_maximum_epochs": 64,
                 })
     return rows, reconstructions
 

@@ -8,6 +8,11 @@ No current result is a complete corrected ZUNA 1.1 benchmark. Full model or HPC
 execution remains blocked until the validation ladder in
 `CODE_REMEDIATION_PLAN_2026-08-21.md` passes.
 
+The primary Stage-0 contract is `PHASE1_CORRECTED_PROTOCOL.md`: minimally
+processed EEG with no ICA, no component subtraction, and no amplitude-based
+epoch selection. Stage-0 cache v3 is obsolete; current code writes v4 so an
+ICA-cleaned tensor cannot be resumed accidentally.
+
 ## Active boundaries
 
 - `benchmark/`: authoritative benchmark source.
@@ -20,4 +25,3 @@ execution remains blocked until the validation ladder in
 Do not invoke root-level historical scripts or import a project-local `zuna`
 package. Active inference must resolve the pinned installed ZUNA distribution
 from the declared environment.
-

@@ -3,9 +3,7 @@
   "contract_status": "development_blocked",
   "blocking_decisions": [
     "cnt_int32_external_acquisition_evidence_missing",
-    "physical_scale_sensitivity_not_yet_run",
-    "specparam_fit_quality_threshold_not_frozen",
-    "ica_component_rejection_rate_not_independently_reviewed"
+    "physical_scale_sensitivity_not_yet_run"
   ],
   "reference": {
     "id_template": "survivor_average_excluding_mastoids:{drop_set}",
@@ -31,8 +29,8 @@
     },
     "CB1": {"stage0_tensor": "excluded_no_verified_position"},
     "CB2": {"stage0_tensor": "excluded_no_verified_position"},
-    "HEOG": {"stage0_tensor": "excluded", "preprocessing_role": "ocular_ica_reference"},
-    "VEOG": {"stage0_tensor": "excluded", "preprocessing_role": "ocular_ica_reference"},
+    "HEOG": {"stage0_tensor": "excluded", "preprocessing_role": "auxiliary_qc_only"},
+    "VEOG": {"stage0_tensor": "excluded", "preprocessing_role": "auxiliary_qc_only"},
     "EKG": {"stage0_tensor": "excluded", "preprocessing_role": "auxiliary_qc"}
   },
   "cnt": {
@@ -44,9 +42,13 @@
   "artifact_cleaning": {
     "filter": {"bandpass_hz": [0.5, 45.0], "design": "firwin", "phase": "zero"},
     "edge_crop_seconds": 10.0,
-    "ocular_ica": {"required": true, "references": ["HEOG", "VEOG"]},
-    "muscle_ica": {"required": true, "review_requirement": "predeclare and review component-score/count acceptance before release"},
-    "rejected_annotations": "exclude from candidate epochs and record each exclusion"
+    "component_removal": "none",
+    "ica_policy": "forbidden in the primary Stage-0 path; any ICA-cleaned sensitivity must use a separate experiment ID and cache",
+    "epoch_amplitude_policy": "record flat or >300 uV peak-to-peak measurements by epoch and channel for descriptive QC only; do not classify channels, reject epochs, or reject recordings from these values",
+    "continuous_channel_policy": "record standard deviation, railing fraction, maximum amplitude, and maximum sample jump; only nonfinite samples are a processing error",
+    "continuous_excursion_policy": "record maximum amplitude and sample-jump warnings but do not reject a recording solely for excursions outside selected marker epochs",
+    "rejected_annotations": "exclude only source intervals explicitly marked bad and record each exclusion",
+    "primary_truth_definition": "source-annotation-accepted non-overlapping marker epochs after deterministic channel mapping, one bandpass, resampling, and edge crop; use available epochs up to the run's requested maximum and record requested, available, and selected counts"
   },
   "coordinates": {
     "input": "MNE standard_1005 head coordinates in metres",
@@ -84,7 +86,7 @@
     "theta_beta": {"drop_set": ["CZ", "FCZ", "FZ", "CPZ"], "submetrics": ["tbr_cz", "tbr_fz"], "theta_hz": [4, 8], "beta_hz": [13, 30], "frame": "drop_safe_scalp_reference", "definition": "ln(theta integrated power)-ln(beta integrated power)"},
     "frontal_midline_theta": {"drop_set": ["FZ", "FCZ", "F1", "F2"], "submetrics": ["fmt_fz", "fmt_rel"], "theta_hz": [4, 8], "posterior": ["O1", "O2", "OZ", "PZ", "POZ"], "frame": "drop_safe_scalp_reference"},
     "mu_asymmetry": {"drop_set": ["C3", "C4", "C1", "C2"], "submetrics": ["mu_asym", "mu_c3", "mu_c4"], "band_hz": [8, 13], "frame": "CSD"},
-    "specparam_peaks": {"drop_set": ["O1", "O2", "OZ", "POZ", "PO3", "PO4"], "submetrics": ["aperiodic_exponent", "aperiodic_offset", "alpha_cf", "alpha_pw", "alpha_bw"], "posterior": ["O1", "O2", "OZ", "POZ", "PO3", "PO4"], "fit_hz": [2, 40], "alpha_hz": [7, 14], "aperiodic_mode": "fixed", "periodic_mode": "gaussian", "peak_width_limits": [0.5, 12.0], "max_n_peaks": 6, "min_peak_height": 0.0, "peak_threshold": 2.0, "fit_quality": {"minimum_r_squared": null, "status": "must_be_frozen_before_release"}}
+    "specparam_peaks": {"drop_set": ["O1", "O2", "OZ", "POZ", "PO3", "PO4"], "submetrics": ["aperiodic_exponent", "aperiodic_offset", "alpha_cf", "alpha_pw", "alpha_bw"], "posterior": ["O1", "O2", "OZ", "POZ", "PO3", "PO4"], "fit_hz": [2, 40], "alpha_hz": [7, 14], "aperiodic_mode": "fixed", "periodic_mode": "gaussian", "peak_width_limits": [0.5, 12.0], "max_n_peaks": 6, "min_peak_height": 0.0, "peak_threshold": 2.0, "fit_diagnostics_policy": "persist fit status, posterior-channel count, R-squared, mean absolute error, detected-peak count, and alpha-peak count without threshold-based exclusion"}
   },
   "failure_policy": {
     "terminal_states": ["success", "model_failure", "qc_failure", "metric_failure", "missing_input", "preempted_incomplete"],

@@ -112,7 +112,7 @@ class Zuna11CorrectedV2Test(unittest.TestCase):
         positions = self._positions(ch_names)
         stage0_key = "9" * 64
         manifest = {
-            "schema": "geeg-zuna-stage0-cache-v3",
+            "schema": "geeg-zuna-stage0-cache-v4",
             "identity": {
                 "protocol_id": PROTOCOL_ID,
                 "preprocessing_sha256": PREPROCESSING_SHA256,
@@ -279,7 +279,7 @@ class Zuna11CorrectedV2Test(unittest.TestCase):
     @staticmethod
     def _run_stage0(data, ch_names, positions):
         manifest = {
-            "schema": "geeg-zuna-stage0-cache-v3",
+            "schema": "geeg-zuna-stage0-cache-v4",
             "identity": {
                 "protocol_id": PROTOCOL_ID,
                 "preprocessing_sha256": PREPROCESSING_SHA256,

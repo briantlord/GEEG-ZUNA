@@ -46,7 +46,7 @@ export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export WANDB_MODE=disabled
 export ZUNA11_RECON_CACHE_DIR_V3="$BASE/zuna11_reconstructions_v3"
-STAGE0_CACHE="$BASE/stage0_cache_v3"
+STAGE0_CACHE="$BASE/stage0_cache_v4"
 mkdir -p "$OUT" "$ZUNA11_RECON_CACHE_DIR_V3" "$STAGE0_CACHE"
 
 "$PYTHON" benchmark/preflight.py \

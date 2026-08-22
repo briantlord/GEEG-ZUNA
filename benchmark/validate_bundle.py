@@ -124,10 +124,11 @@ def validate(run_path: Path, result_path: Path, qc_path: Path,
             f"Result-unit completeness failure: missing={len(missing_results)}, extra={len(extra_results)}"
         )
 
-    expected_reconstructions = {
-        (row["recording"], row["method"], row["drop_set"])
+    expected_reconstruction_rows = {
+        (row["recording"], row["method"], row["drop_set"]): row
         for row in frozen["expected_reconstruction_units"]
     }
+    expected_reconstructions = set(expected_reconstruction_rows)
     actual_reconstructions = set(successful_reconstructions) | set(failed_reconstructions)
     missing_reconstructions = expected_reconstructions - actual_reconstructions
     extra_reconstructions = actual_reconstructions - expected_reconstructions
@@ -149,8 +150,14 @@ def validate(run_path: Path, result_path: Path, qc_path: Path,
             raise ValueError(f"ZUNA unit uses the wrong cache schema: {key}")
         if reconstruction.get("status") != "complete" or reconstruction.get("settings", {}).get("sample_steps") != 50:
             raise ValueError(f"ZUNA unit is incomplete or did not use 50 steps: {key}")
-        if reconstruction.get("shape", [0])[0] != 64:
-            raise ValueError(f"ZUNA unit did not reconstruct 64 epochs: {key}")
+        shape = reconstruction.get("shape")
+        epoch_count = shape[0] if isinstance(shape, list) and shape else 0
+        requested_maximum = int(
+            expected_reconstruction_rows[key]["requested_maximum_epochs"])
+        if not 1 <= int(epoch_count) <= requested_maximum:
+            raise ValueError(
+                "ZUNA unit epoch count is outside 1..requested maximum "
+                f"({requested_maximum}): {key}, shape={shape}")
         if reconstruction.get("model", {}).get("identity") != frozen.get("model"):
             raise ValueError(f"ZUNA model identity differs from run manifest: {key}")
         if (

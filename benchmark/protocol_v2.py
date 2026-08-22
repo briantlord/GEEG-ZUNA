@@ -15,7 +15,7 @@ except ImportError:
     from contract import CONTRACT_SHA256, EXPERIMENT_ID
 
 
-PROTOCOL_ID = "geeg-zuna-remediated-v1"
+PROTOCOL_ID = "geeg-zuna-minimal-stage0-v1"
 
 PREPROCESSING_SPEC = {
     "protocol_id": PROTOCOL_ID,
@@ -30,26 +30,21 @@ PREPROCESSING_SPEC = {
     "notch_hz": [],
     "target_sfreq_hz": 256,
     "edge_crop_seconds": 10.0,
-    "emg_cleaning": "MNE ICA fastica + find_bads_muscle",
-    "emg_required": True,
-    "muscle_threshold": 0.5,
-    "muscle_band_hz": [7.0, 45.0],
-    "ocular_cleaning": "MNE ICA + find_bads_eog using HEOG and VEOG",
-    "ocular_required": True,
-    "ocular_threshold": 3.0,
-    "ocular_measure": "zscore",
-    "ica_components": 20,
-    "ica_random_state": 0,
+    "component_removal": "none",
+    "ica_policy": "forbidden_in_primary_stage0",
+    "auxiliary_policy": "retain through filtering/resampling/cropping, then exclude from EEG tensor",
     "epoch_seconds": 5.0,
     "target_epochs": 64,
-    "minimum_clean_epochs": 48,
+    "epoch_count_policy": "use_available_source_valid_epochs_up_to_requested_maximum",
     "event_codes": [str(value) for value in range(1, 9)],
     "epoch_peak_to_peak_max_uv": 300.0,
     "epoch_peak_to_peak_flat_uv": 0.1,
-    "session_flat_std_uv": 0.1,
-    "session_rail_fraction_max": 0.01,
-    "analysis_abs_max_uv": 1000.0,
-    "analysis_max_sample_jump_uv": 500.0,
+    "epoch_amplitude_policy": "record_only_no_rejection",
+    "channel_amplitude_policy": "record_per_channel_counts_and_fractions_without_classification_or_exclusion",
+    "bad_annotation_policy": "exclude_only_source_intervals_explicitly_marked_bad",
+    "continuous_channel_statistics": "record_standard_deviation_railing_fraction_amplitude_and_sample_jumps_without_quality_exclusion",
+    "analysis_abs_warn_uv": 1000.0,
+    "analysis_max_sample_jump_warn_uv": 500.0,
     "raw_tail_abs_warn_uv": 100000.0,
     "reference_stage0": "none",
     "reference_evaluation": "average over surviving non-mastoid channels after dropout",

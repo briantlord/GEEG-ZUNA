@@ -6,9 +6,10 @@ releases.
 
 The scientific contract is `../config/scientific_contract_v1.json`. Its current
 status is `development_blocked`; therefore no production ZUNA or full HPC run is
-authorized. In particular, the pinned ZUNA inference coordinate range conflicts
-with nine unmodified `standard_1005` positions, and the adapter now fails closed
-instead of allowing ZUNA to clamp them.
+authorized. The primary Stage-0 path performs no ICA or component subtraction;
+cache schema v4 prevents reuse of the earlier ICA-cleaned v3 tensor. Coordinate
+handling replicates and records the pinned official token clamping behavior and
+fails if complete XYZ token triplets collide.
 
 ## Active commands
 
@@ -42,4 +43,3 @@ instead of allowing ZUNA to clamp them.
 See `HPC_RUNBOOK_zuna11.md` for the gated HPC workflow. The old one-step model
 artifact remains useful only for saved-artifact replay and must fail experiment
 completeness validation.
-

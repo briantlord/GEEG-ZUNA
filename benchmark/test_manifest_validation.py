@@ -35,6 +35,11 @@ class ManifestValidationTest(unittest.TestCase):
             self.assertEqual(manifest["expected_counts"]["recon_result_units"], 1176)
             self.assertEqual(manifest["expected_counts"]["result_units"], 1764)
             self.assertEqual(manifest["expected_counts"]["reconstruction_units"], 420)
+            self.assertTrue(all(
+                unit["requested_maximum_epochs"] == 64
+                and "expected_epochs" not in unit
+                for unit in manifest["expected_reconstruction_units"]
+            ))
 
     def test_manifest_tamper_and_incomplete_bundle_are_rejected(self):
         with tempfile.TemporaryDirectory(prefix="run_manifest_validation_") as temporary:
