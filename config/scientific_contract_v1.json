@@ -1,0 +1,95 @@
+{
+  "schema": "geeg-zuna-scientific-contract-v1",
+  "contract_status": "development_blocked",
+  "blocking_decisions": [
+    "cnt_int32_external_acquisition_evidence_missing",
+    "physical_scale_sensitivity_not_yet_run",
+    "specparam_fit_quality_threshold_not_frozen",
+    "ica_component_rejection_rate_not_independently_reviewed"
+  ],
+  "reference": {
+    "id_template": "survivor_average_excluding_mastoids:{drop_set}",
+    "stage0": "none",
+    "truth_and_reconstruction": "subtract the mean over observed non-mastoid channels after applying the declared drop set",
+    "test_retest_floor": "for each metric and drop set, compare Rest1 and Rest2 truth in that same drop-set-specific reference frame",
+    "forbidden": "full-montage truth floors compared with dropout-frame reconstruction errors"
+  },
+  "channel_roles": {
+    "M1": {
+      "stage0_tensor": "included",
+      "zuna_context": "included_when_observed",
+      "reference_contributor": false,
+      "drop_target": false,
+      "metric_channel": false
+    },
+    "M2": {
+      "stage0_tensor": "included",
+      "zuna_context": "included_when_observed",
+      "reference_contributor": false,
+      "drop_target": false,
+      "metric_channel": false
+    },
+    "CB1": {"stage0_tensor": "excluded_no_verified_position"},
+    "CB2": {"stage0_tensor": "excluded_no_verified_position"},
+    "HEOG": {"stage0_tensor": "excluded", "preprocessing_role": "ocular_ica_reference"},
+    "VEOG": {"stage0_tensor": "excluded", "preprocessing_role": "ocular_ica_reference"},
+    "EKG": {"stage0_tensor": "excluded", "preprocessing_role": "auxiliary_qc"}
+  },
+  "cnt": {
+    "reader": "mne.io.read_raw_cnt",
+    "data_format": "int32",
+    "development_choice": true,
+    "production_requirement": "attach independent acquisition/header/byte-layout evidence before release"
+  },
+  "artifact_cleaning": {
+    "filter": {"bandpass_hz": [0.5, 45.0], "design": "firwin", "phase": "zero"},
+    "edge_crop_seconds": 10.0,
+    "ocular_ica": {"required": true, "references": ["HEOG", "VEOG"]},
+    "muscle_ica": {"required": true, "review_requirement": "predeclare and review component-score/count acceptance before release"},
+    "rejected_annotations": "exclude from candidate epochs and record each exclusion"
+  },
+  "coordinates": {
+    "input": "MNE standard_1005 head coordinates in metres",
+    "transform": "official_zuna_componentwise_discrete_bin_clamp",
+    "zuna_expected_bounds_m": [[-0.12, -0.12, -0.12], [0.12, 0.12, 0.12]],
+    "discrete_bins_per_axis": 100,
+    "out_of_bounds_policy": "replicate the pinned official tokenizer: warn conceptually, convert normalized coordinates to integer bins, and clamp bins to [0,99]; preserve original and componentwise-clipped coordinates",
+    "collision_policy": "fail if any active channels map to the same complete xyz token triplet",
+    "verified_current_montage": "nine of 62 channels saturate the z token at 99; all 62 complete xyz token triplets remain unique",
+    "reason": "official ZUNA usage directs standard_1005 montage attachment, while the pinned tokenizer explicitly clamps out-of-range discrete bins; the benchmark records this transform rather than applying an undocumented geometric rescale",
+    "official_usage_reference": "https://github.com/Zyphra/ZUNA#setting-montages",
+    "pinned_tokenizer_source": "zuna 1.1.3 eeg_data.py::discretize_chan_pos"
+  },
+  "zuna_scaling": {
+    "primary_deployable_strategy": "median_survivor_std_zero_mean_carrier",
+    "predeclared_sensitivities": [
+      "spatial_neighbor_robust_std_zero_mean_carrier",
+      "observed_position_logstd_ridge_zero_mean_carrier",
+      "normalized_scale_free_output"
+    ],
+    "strategy_definitions": {
+      "median_survivor_std_zero_mean_carrier": "per epoch, assign every target the median SD of all surviving channels",
+      "spatial_neighbor_robust_std_zero_mean_carrier": "per epoch and target, assign the median SD of the four nearest surviving channels in the frozen coordinate frame",
+      "observed_position_logstd_ridge_zero_mean_carrier": "per epoch, fit log channel SD from surviving standardized xyz positions using intercept-unpenalized ridge with xyz penalty 0.1, then predict each target position",
+      "normalized_scale_free_output": "store model target output divided by the blind carrier scale used for that target and epoch"
+    },
+    "forbidden": "target waveform, target mean, target standard deviation, or target-informed strategy selection",
+    "release_requirement": "store normalized and physical outputs and quantify all predeclared sensitivities"
+  },
+  "metrics": {
+    "welch": {"sfreq_hz": 256, "nperseg": 1024, "window": "scipy.signal.welch_default_hann", "epoch_aggregation": "arithmetic_mean_psd"},
+    "bandpower": {"integration": "trapezoid", "interval": "left_closed_right_open"},
+    "csd": {"implementation": "mne.preprocessing.compute_current_source_density_defaults", "montage": "standard_1005"},
+    "faa": {"drop_set": ["F3", "F4", "F7", "F8"], "submetrics": ["faa", "faa_lat"], "band_hz": [8, 13], "frame": "CSD", "definition": "ln(right bandpower)-ln(left bandpower)"},
+    "theta_beta": {"drop_set": ["CZ", "FCZ", "FZ", "CPZ"], "submetrics": ["tbr_cz", "tbr_fz"], "theta_hz": [4, 8], "beta_hz": [13, 30], "frame": "drop_safe_scalp_reference", "definition": "ln(theta integrated power)-ln(beta integrated power)"},
+    "frontal_midline_theta": {"drop_set": ["FZ", "FCZ", "F1", "F2"], "submetrics": ["fmt_fz", "fmt_rel"], "theta_hz": [4, 8], "posterior": ["O1", "O2", "OZ", "PZ", "POZ"], "frame": "drop_safe_scalp_reference"},
+    "mu_asymmetry": {"drop_set": ["C3", "C4", "C1", "C2"], "submetrics": ["mu_asym", "mu_c3", "mu_c4"], "band_hz": [8, 13], "frame": "CSD"},
+    "specparam_peaks": {"drop_set": ["O1", "O2", "OZ", "POZ", "PO3", "PO4"], "submetrics": ["aperiodic_exponent", "aperiodic_offset", "alpha_cf", "alpha_pw", "alpha_bw"], "posterior": ["O1", "O2", "OZ", "POZ", "PO3", "PO4"], "fit_hz": [2, 40], "alpha_hz": [7, 14], "aperiodic_mode": "fixed", "periodic_mode": "gaussian", "peak_width_limits": [0.5, 12.0], "max_n_peaks": 6, "min_peak_height": 0.0, "peak_threshold": 2.0, "fit_quality": {"minimum_r_squared": null, "status": "must_be_frozen_before_release"}}
+  },
+  "failure_policy": {
+    "terminal_states": ["success", "model_failure", "qc_failure", "metric_failure", "missing_input", "preempted_incomplete"],
+    "required": "every expected unit appears exactly once with a terminal state",
+    "cohort_rule": "failures remain in denominators and reports; they may not disappear from aggregation",
+    "selection_rule": "held-out truth may quantify quality but may not silently select which units are analyzed"
+  }
+}

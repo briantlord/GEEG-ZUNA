@@ -1,0 +1,55 @@
+# Raw EEG and derived arrays
+GEEG_Raw/
+*.cnt
+*.eeg
+*.vhdr
+*.vmrk
+*.npy
+*.npz
+*.fif
+*.pt
+*.csv
+*.jsonl
+*.png
+
+# Model downloads and local environments
+HF_cache/
+.zuna11_local_env/
+zuna_env/
+zuna_env_linux_backup/
+.venv/
+venv/
+
+# Generated releases, results, caches, logs, and scratch artifacts
+GEEG-ZUNA-share/
+dist/
+results/
+comparison_results/
+results_n_channel_dropout/
+brain_artifacts/
+test_fif_out/
+test_pt_out*/
+test_recon_pt/
+_tmp_*/
+benchmark/_pilot_out/
+benchmark/*.csv
+benchmark/*.log
+benchmark/*.npy
+benchmark/*.npz
+benchmark/*.png
+benchmark/metrics/docs/**/_smoke.csv
+*.log
+
+# Archived invalid/legacy runtime material is preserved locally but is not release source
+archive/
+
+# Python/editor/OS state
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.mne_local/
+.claude/
+.DS_Store
+Thumbs.db
