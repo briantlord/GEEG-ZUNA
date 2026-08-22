@@ -14,7 +14,9 @@ during this remediation work.
 
 ### Authoritative source/release boundary
 
-- Initialized a root Git repository and staged a source-only snapshot.
+- Initialized a root Git repository and committed the audited source baseline as
+  `5e4c6a7120ccc44b48e2f5e417c93cc21effac4b` using the authenticated GitHub
+  no-reply identity for `briantlord`.
 - Added ignore rules for raw EEG, model weights, environments, caches, results,
   generated releases, and archives.
 - Declared `benchmark/` authoritative and made `GEEG-ZUNA-share/` generated.
@@ -160,15 +162,11 @@ during this remediation work.
   threshold remains deliberately unfrozen and therefore blocks release.
 - Determinism at the production 50-step setting has not been measured.
 - The rebuilt HPC path has not had the required two-task same-node systems test.
-- Git has no commit yet because repository author identity has not been set;
-  generated release manifests therefore say `UNCOMMITTED`.
 
 ## Next implementation order
 
-1. Resolve or externally escalate the coordinate, CNT-format, ICA, and
-   specparam-threshold decisions.
-2. Commit the authoritative source, rebuild the release with the commit ID, and
-   rerun CPU/static plus saved-artifact gates.
-3. Only then run one epoch at 50 steps and execute the frozen calibration and
+1. Resolve or externally escalate the CNT-format, ICA, and specparam-threshold
+   decisions.
+2. Only then run one epoch at 50 steps and execute the frozen calibration and
    determinism sensitivities; do not start the full recording or HPC
    array until each subsequent validation gate passes.
