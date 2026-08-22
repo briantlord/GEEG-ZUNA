@@ -41,6 +41,26 @@ class ManifestValidationTest(unittest.TestCase):
                 for unit in manifest["expected_reconstruction_units"]
             ))
 
+    def test_manifest_can_declare_an_exact_metric_subset(self):
+        with tempfile.TemporaryDirectory(prefix="run_manifest_metric_subset_") as temporary:
+            recording = Path(temporary) / "G001Day1Rest1.cnt"
+            recording.write_bytes(b"recording")
+            selected = ["faa", "theta_beta", "frontal_midline_theta"]
+            manifest = run_manifest.create_manifest(
+                [recording], ["spline", "zuna"],
+                model={"revision": "test", "weight_sha256": "a" * 64},
+                metrics=selected,
+            )
+            self.assertEqual(manifest["metrics"], selected)
+            self.assertEqual(manifest["expected_counts"]["truth_units"], 6)
+            self.assertEqual(manifest["expected_counts"]["recon_result_units"], 12)
+            self.assertEqual(manifest["expected_counts"]["result_units"], 18)
+            self.assertEqual(manifest["expected_counts"]["reconstruction_units"], 6)
+            self.assertEqual(
+                {unit["metric"] for unit in manifest["expected_result_units"]},
+                set(selected),
+            )
+
     def test_manifest_tamper_and_incomplete_bundle_are_rejected(self):
         with tempfile.TemporaryDirectory(prefix="run_manifest_validation_") as temporary:
             root = Path(temporary)

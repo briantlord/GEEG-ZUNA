@@ -331,6 +331,8 @@ def main():
     registry = discover(args.metrics)
     if not registry:
         raise RuntimeError("no metrics registered/selected")
+    if set(registry) != set(frozen_run["metrics"]):
+        parser.error("--metrics must exactly match the immutable run manifest")
     print(
         f"[metrics v4] {list(registry)} | methods={args.methods} | run={frozen_run['run_id'][:16]}",
         flush=True,

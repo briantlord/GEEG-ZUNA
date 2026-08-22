@@ -79,13 +79,25 @@ def parse_recording(path: Path) -> dict:
     }
 
 
-def expected_units(recordings: list[dict], methods: list[str]):
+def _metric_items(metric_keys: list[str] | None = None):
+    available = {
+        key: value for key, value in CONTRACT["metrics"].items()
+        if isinstance(value, dict) and "drop_set" in value and "submetrics" in value
+    }
+    selected = list(available) if metric_keys is None else list(metric_keys)
+    if not selected or len(selected) != len(set(selected)):
+        raise ValueError("Metrics must be a non-empty unique list")
+    unknown = sorted(set(selected) - set(available))
+    if unknown:
+        raise ValueError(f"Unknown metric keys: {unknown}")
+    return [(key, available[key]) for key in selected]
+
+
+def expected_units(recordings: list[dict], methods: list[str],
+                   metric_keys: list[str] | None = None):
     rows = []
     reconstructions = []
-    metric_items = [
-        (key, value) for key, value in CONTRACT["metrics"].items()
-        if isinstance(value, dict) and "drop_set" in value and "submetrics" in value
-    ]
+    metric_items = _metric_items(metric_keys)
     for recording in recordings:
         for metric, definition in metric_items:
             drop_set = "+".join(sorted(name.upper() for name in definition["drop_set"]))
@@ -117,7 +129,8 @@ def expected_units(recordings: list[dict], methods: list[str]):
 
 
 def create_manifest(files: list[Path], methods: list[str], model: dict | None = None,
-                    calibration_strategy: str | None = None) -> dict:
+                    calibration_strategy: str | None = None,
+                    metrics: list[str] | None = None) -> dict:
     if not files:
         raise ValueError("Run manifest requires at least one recording")
     if len(methods) != len(set(methods)) or not methods:
@@ -132,7 +145,9 @@ def create_manifest(files: list[Path], methods: list[str], model: dict | None = 
     names = [item["recording"] for item in recordings]
     if len(names) != len(set(names)):
         raise ValueError("Duplicate recording filenames are forbidden")
-    rows, reconstructions = expected_units(recordings, methods)
+    metric_items = _metric_items(metrics)
+    selected_metrics = [key for key, _definition in metric_items]
+    rows, reconstructions = expected_units(recordings, methods, selected_metrics)
     pairs = {}
     for item in recordings:
         key = f"{item['subject']}:Day{item['day']}"
@@ -147,6 +162,7 @@ def create_manifest(files: list[Path], methods: list[str], model: dict | None = 
         "source_sha256": source,
         "recordings": recordings,
         "methods": methods,
+        "metrics": selected_metrics,
         "model": model,
         "calibration_strategy": calibration_strategy,
         "coordinate_strategy": {
@@ -186,7 +202,7 @@ def load_verified(path: str | Path) -> dict:
     identity_keys = (
         "experiment_id", "scientific_contract_sha256", "protocol_id",
         "preprocessing_sha256", "git_commit", "source_sha256", "recordings",
-        "methods", "model", "expected_result_units",
+        "methods", "metrics", "model", "expected_result_units",
         "calibration_strategy", "coordinate_strategy",
         "expected_reconstruction_units", "pair_structure",
     )
@@ -205,6 +221,7 @@ def main() -> None:
     source.add_argument("--data-dir", type=Path)
     source.add_argument("--recordings", nargs="+", type=Path)
     parser.add_argument("--methods", nargs="+", default=["spline", "zuna"])
+    parser.add_argument("--metrics", nargs="+", default=None)
     parser.add_argument("--zuna-calibration", choices=CALIBRATION_STRATEGIES,
                         default=DEFAULT_CALIBRATION)
     parser.add_argument("--expected-recordings", type=int, default=None)
@@ -226,7 +243,8 @@ def main() -> None:
             raise RuntimeError(f"Cannot freeze ZUNA model identity: {error}") from error
     calibration = args.zuna_calibration if "zuna" in args.methods else None
     manifest = create_manifest(
-        files, args.methods, model=model, calibration_strategy=calibration
+        files, args.methods, model=model, calibration_strategy=calibration,
+        metrics=args.metrics,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
