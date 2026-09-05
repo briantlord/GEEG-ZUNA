@@ -6,7 +6,7 @@ unambiguous spec handed to the coding step. It implements the Stage-1 requiremen
 and mirrors the structure of the worked reference `m_faa.py`. **Docs only — no code is written at
 this stage; no shared file is ever modified.**
 
-Deliverable file: `<user-home>/Projects/GEEG-ZUNA/benchmark/metrics/m_theta_beta.py`
+Deliverable file: `benchmark/metrics/m_theta_beta.py`
 
 ---
 
@@ -152,9 +152,9 @@ real data, producing **finite** truth and recon rows. The gate is *finiteness an
 expected rows*, not an error-magnitude threshold.
 
 ### Interpreter & working directory
-- Interpreter: `<user-home>/Projects/GEEG-ZUNA/zuna_env/Scripts/python.exe` (per project memory;
+- Interpreter: `zuna_env/Scripts/python.exe` (relative to the repository root;
   do not use a bare `python`).
-- **Run from the repo root** `<user-home>/Projects/GEEG-ZUNA` — `run.py` globs
+- **Run from the repository root** — `run.py` globs
   `GEEG_Raw/G001Day*.cnt` relative to the current directory. G001 has 10 recordings
   (`Day1..5 × Rest1..2`), all present.
 
@@ -168,8 +168,7 @@ zuna_env/Scripts/python.exe benchmark/metrics/run.py \
     --out <SCRATCH>/theta_beta_selftest.csv
 ```
 
-`<SCRATCH>` = the session scratchpad dir
-`<user-home>/AppData/Local/Temp/claude/C--Users-brian-Projects-GEEG-ZUNA/<session>/scratchpad`.
+`<SCRATCH>` = the session scratchpad directory under the system temporary directory.
 `--metrics theta_beta` makes `discover` import **only** `m_theta_beta.py`, isolating the test from
 any half-written sibling plug-in. `--methods linear` skips the GPU/HF-weights ZUNA path and the
 slower spline path.

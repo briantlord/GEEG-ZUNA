@@ -2,7 +2,6 @@
 # Full-cohort launcher. It remains fail-closed until the scientific contract is
 # production_ready and APPROVED_RUN_ID exactly matches the immutable manifest.
 #SBATCH --job-name=zuna11_metrics
-#SBATCH --account=<slurm-allocation-name>
 #SBATCH --partition=gpu_standard
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
@@ -11,12 +10,15 @@
 #SBATCH --mem=32gb
 #SBATCH --time=06:00:00
 #SBATCH --array=0-41%20
-#SBATCH --output=/path/to/GEEG_ZUNA/logs/zuna11_%A_%a.out
 
 set -euo pipefail
 
-BASE=/path/to/GEEG_ZUNA
-REPO="$BASE/GEEG-ZUNA-share"
+# Resolve the uploaded release directory from this script's location. Supply
+# site-specific account and log settings to sbatch at submission time; see the
+# HPC runbook.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
+BASE="$(cd "$REPO/.." && pwd)"
 OUT="$BASE/zuna11_out"
 RUN_MANIFEST="$OUT/run_manifest.json"
 APPROVAL="$OUT/APPROVED_RUN_ID"

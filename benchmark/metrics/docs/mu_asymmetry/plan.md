@@ -202,8 +202,8 @@ Determinism: `compute` is pure given `(data, ch_names)`.
 
 ## 5. Robustness self-test (run after coding, before declaring done)
 
-**Interpreter:** `zuna_env/Scripts/python.exe` (per project memory — weights/env are local; the D:
-path is stale). All commands run from repo root `<user-home>/Projects/GEEG-ZUNA`.
+**Interpreter:** `zuna_env/Scripts/python.exe` (relative to the repository root; weights and the
+environment are local). Run all commands from the repository root.
 
 **Step A — import/registration smoke test** (no data; fast fail on syntax/contract errors):
 ```

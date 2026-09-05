@@ -184,8 +184,8 @@ keys as finite floats or `float('nan')`. (The helper's only non-finite output is
 **Goal:** invoke the real runner on subject G001 with method `linear` and confirm finite truth **and**
 recon rows for all five submetrics.
 
-**Interpreter (per project memory):** `zuna_env/Scripts/python.exe`. Run from the repo root
-`<user-home>/Projects/GEEG-ZUNA`.
+**Interpreter:** `zuna_env/Scripts/python.exe` (relative to the repository root). Run from the
+repository root.
 
 **Command** (fresh `--out` so the resumable runner does not skip already-logged recordings; `--metrics
 specparam_peaks` makes `discover` import **only** `m_specparam_peaks.py`, isolating the run from

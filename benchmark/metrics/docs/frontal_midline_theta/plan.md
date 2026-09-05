@@ -138,8 +138,8 @@ valid montages.
 
 ## 5. Robustness self-test (run after coding, before sign-off)
 
-Interpreter: **`zuna_env/Scripts/python.exe`** (per project memory; run all commands from repo root
-`<user-home>\Projects\GEEG-ZUNA` so `run.py`'s `GEEG_Raw/G001Day*.cnt` glob resolves). Truth
+Interpreter: **`zuna_env/Scripts/python.exe`** (relative to the repository root; run all commands
+from the repository root so `run.py`'s `GEEG_Raw/G001Day*.cnt` glob resolves). Truth
 epochs are cached in `%TEMP%/tcache`, so preprocessing is fast.
 
 ### 5.1 Primary: real runner on G001, method `linear`

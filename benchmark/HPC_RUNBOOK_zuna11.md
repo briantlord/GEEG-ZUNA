@@ -1,6 +1,14 @@
 # Gated ZUNA 1.1 HPC runbook
 
-Base directory: `/path/to/GEEG_ZUNA`.
+Choose the installation root for your HPC and export it once per shell session:
+
+```bash
+export GEEG_ZUNA_BASE="/path/to/GEEG_ZUNA"
+export GEEG_ZUNA_ACCOUNT="<slurm-allocation-name>"
+```
+
+The examples below use `$GEEG_ZUNA_BASE`; no username, allocation, or
+site-specific filesystem path is built into the project.
 
 The full array must not be submitted yet. `benchmark/preflight.py` intentionally
 fails while the scientific contract has unresolved blockers. The SLURM launcher
@@ -15,7 +23,7 @@ upload that generated directory. Do not upload the old hand-maintained share.
 The HPC layout is:
 
 ```text
-/path/to/GEEG_ZUNA/
+$GEEG_ZUNA_BASE/
   GEEG-ZUNA-share/
   GEEG_Raw/
   HF_cache/
@@ -30,7 +38,7 @@ body executes.
 ## 2. Verify the environment and weights
 
 Use Python 3.11 at
-`/path/to/GEEG_ZUNA/zuna11_env/bin/python`. Install
+`$GEEG_ZUNA_BASE/zuna11_env/bin/python`. Install
 `requirements.lock.txt` with a CUDA-enabled Torch 2.6.0 build appropriate for
 the HPC driver. Model download is a separate online setup step. Execution uses
 `HF_HUB_OFFLINE=1` and the exact revision, weight hash, and config hash frozen in
@@ -41,7 +49,7 @@ the run manifest.
 After upload completes:
 
 ```bash
-BASE=/path/to/GEEG_ZUNA
+BASE="$GEEG_ZUNA_BASE"
 PYTHON="$BASE/zuna11_env/bin/python"
 cd "$BASE/GEEG-ZUNA-share"
 mkdir -p "$BASE/logs" "$BASE/zuna11_out"
@@ -74,7 +82,9 @@ ID (alone) in `$BASE/zuna11_out/APPROVED_RUN_ID`.
 
 ```bash
 cd "$BASE/GEEG-ZUNA-share"
-sbatch benchmark/slurm_zuna11_metrics.sh
+sbatch --account="$GEEG_ZUNA_ACCOUNT" \
+  --output="$BASE/logs/zuna11_%A_%a.out" \
+  benchmark/slurm_zuna11_metrics.sh
 ```
 
 After every exact shard exists:
